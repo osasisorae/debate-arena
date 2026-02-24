@@ -491,9 +491,20 @@
             document.getElementById('next-round-btn').classList.add('hidden');
             document.getElementById('judge-btn').classList.add('hidden');
 
-            // Reset content for this round
-            document.getElementById('gpt-content').innerHTML = '';
-            document.getElementById('claude-content').innerHTML = '';
+            // Reset content for this round — clear old DOM nodes completely
+            const gptContent = document.getElementById('gpt-content');
+            const claudeContent = document.getElementById('claude-content');
+            gptContent.textContent = '';
+            claudeContent.textContent = '';
+            
+            // Create persistent cursor elements (avoids innerHTML manipulation)
+            const gptCursor = document.createElement('span');
+            gptCursor.className = 'typing-cursor';
+            gptContent.appendChild(gptCursor);
+            const claudeCursor = document.createElement('span');
+            claudeCursor.className = 'typing-cursor';
+            claudeContent.appendChild(claudeCursor);
+            
             document.getElementById('gpt-status').textContent = 'WAITING';
             document.getElementById('claude-status').textContent = 'WAITING';
 
@@ -515,17 +526,23 @@
                 statusEl.textContent = 'STREAMING';
                 statusEl.classList.add('text-emerald-400');
                 
+                // Clear any previous content for this model but keep cursor
                 const contentEl = document.getElementById(`${data.model}-content`);
-                contentEl.innerHTML = '<span class="typing-cursor"></span>';
+                const cursor = data.model === 'gpt' ? gptCursor : claudeCursor;
+                contentEl.textContent = '';
+                contentEl.appendChild(cursor);
             });
 
             evtSource.addEventListener('token', (e) => {
+                try {
                 const data = JSON.parse(e.data);
                 const contentEl = document.getElementById(`${data.model}-content`);
-                // Remove cursor, add token, re-add cursor
-                contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '') + 
-                    escapeHtml(data.content) + '<span class="typing-cursor"></span>';
+                const cursor = data.model === 'gpt' ? gptCursor : claudeCursor;
+                // O(1) DOM insert: create text node and insert before cursor
+                const textNode = document.createTextNode(data.content);
+                contentEl.insertBefore(textNode, cursor);
                 contentEl.scrollTop = contentEl.scrollHeight;
+                } catch (err) { console.error('token parse error:', err); }
             });
 
             evtSource.addEventListener('done', (e) => {
@@ -537,11 +554,10 @@
                 roundContent[model] = data.content || '';
                 if (data.blocked) blockedModels.add(model);
 
-                // Don't touch DOM for blocked models — security_blocked already rendered
+                // Remove cursor when done
                 if (!blockedModels.has(model)) {
-                    // Remove cursor
-                    const contentEl = document.getElementById(`${model}-content`);
-                    contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '');
+                    const cursor = model === 'gpt' ? gptCursor : claudeCursor;
+                    if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
                 }
 
                 // Update status
@@ -611,6 +627,9 @@
                 blockedModels.add(data.model);
                 const model = data.model;
                 const contentEl = document.getElementById(`${model}-content`);
+                // Remove cursor before replacing content
+                const cursor = model === 'gpt' ? gptCursor : claudeCursor;
+                if (cursor.parentNode) cursor.parentNode.removeChild(cursor);
                 contentEl.innerHTML = `
                     <div class="border border-red-500/30 bg-red-500/10 rounded-lg p-4 mt-2">
                         <div class="flex items-center gap-2 mb-2">
@@ -666,27 +685,26 @@
             }
             count.textContent = roundHistory.length - 1; // exclude current
 
-            // Build history HTML (all except the latest round which is displayed live)
-            let html = '';
-            for (let i = 0; i < roundHistory.length - 1; i++) {
-                const r = roundHistory[i];
-                const borderColor = r.isAttack ? 'border-red-500/20' : 'border-arena-border';
-                const badge = r.isAttack ? `<span class="text-[9px] font-mono text-red-400 border border-red-500/30 px-1 py-0.5 rounded">⚠ ${r.attackType.replace(/_/g, ' ')}</span>` : '';
-                html += `
-                    <div class="p-3 rounded-lg border ${borderColor} bg-arena-card/30">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="text-[10px] font-mono text-gray-500">R${r.round}</span>
-                            <span class="text-xs font-medium text-gray-400">${r.label}</span>
-                            ${badge}
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
-                            <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gptBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.gpt || '').substring(0, 100)) + '...'}</div>
-                            <div><span class="text-claude-light font-medium">Claude:</span> ${r.claudeBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.claude || '').substring(0, 100)) + '...'}</div>
-                        </div>
-                    </div>
-                `;
-            }
-            content.innerHTML = html;
+            // Only append the LATEST completed round (O(1) instead of rebuilding all)
+            const r = roundHistory[roundHistory.length - 2]; // second-to-last = just completed
+            if (!r) return;
+            
+            const borderColor = r.isAttack ? 'border-red-500/20' : 'border-arena-border';
+            const badge = r.isAttack ? `<span class="text-[9px] font-mono text-red-400 border border-red-500/30 px-1 py-0.5 rounded">⚠ ${r.attackType.replace(/_/g, ' ')}</span>` : '';
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-lg border ${borderColor} bg-arena-card/30`;
+            div.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[10px] font-mono text-gray-500">R${r.round}</span>
+                    <span class="text-xs font-medium text-gray-400">${escapeHtml(r.label)}</span>
+                    ${badge}
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
+                    <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gptBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.gpt || '').substring(0, 100)) + '...'}</div>
+                    <div><span class="text-claude-light font-medium">Claude:</span> ${r.claudeBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.claude || '').substring(0, 100)) + '...'}</div>
+                </div>
+            `;
+            content.appendChild(div);
         }
 
         function toggleHistory() {
@@ -807,6 +825,7 @@
             document.getElementById('judge-btn').classList.add('hidden');
             document.getElementById('attack-banner').classList.add('hidden');
             document.getElementById('history-panel').classList.add('hidden');
+            document.getElementById('history-content').innerHTML = '';
 
             // Reset content
             document.getElementById('gpt-content').innerHTML = '<span class="text-gray-600 italic">Waiting for debate to start...</span>';
