@@ -1,6 +1,6 @@
 """
-AI Debate Arena — FastAPI Application
-Watch GPT-4o Mini and Claude Sonnet 4 debate any topic.
+AI Debate Arena — FastAPI Application v2
+10 rounds with prompt injection attacks and security triggers.
 All LLM calls routed through PrysmAI for full observability.
 """
 
@@ -14,11 +14,13 @@ from sse_starlette.sse import EventSourceResponse
 
 from debate_engine import (
     MODELS,
+    ROUND_TYPES,
+    TOTAL_ROUNDS,
     run_debate_round_streaming,
     judge_debate,
 )
 
-app = FastAPI(title="AI Debate Arena", version="1.0.0")
+app = FastAPI(title="AI Debate Arena", version="2.0.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -32,6 +34,8 @@ PRESET_TOPICS = [
     "Is social media doing more harm than good?",
     "Should we colonize Mars before fixing Earth?",
     "Is open-source AI safer than closed-source AI?",
+    "Should governments regulate AI development?",
+    "Is cryptocurrency the future of finance?",
 ]
 
 
@@ -41,6 +45,8 @@ async def home(request: Request):
         "request": request,
         "preset_topics": PRESET_TOPICS,
         "models": MODELS,
+        "round_types": ROUND_TYPES,
+        "total_rounds": TOTAL_ROUNDS,
     })
 
 
@@ -60,11 +66,16 @@ async def start_debate(request: Request):
         "gpt_history": [],
         "claude_history": [],
         "current_round": 0,
-        "total_rounds": 3,
+        "total_rounds": TOTAL_ROUNDS,
         "status": "active",
     }
     
-    return {"session_id": session_id, "topic": topic, "total_rounds": 3}
+    return {
+        "session_id": session_id,
+        "topic": topic,
+        "total_rounds": TOTAL_ROUNDS,
+        "round_types": {str(k): v for k, v in ROUND_TYPES.items()},
+    }
 
 
 @app.get("/api/debate/{session_id}/round/{round_num}")

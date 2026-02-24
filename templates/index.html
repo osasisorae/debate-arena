@@ -20,6 +20,7 @@
                         gpt: { DEFAULT: '#3B82F6', light: '#60A5FA', dark: '#1D4ED8' },
                         claude: { DEFAULT: '#06B6D4', light: '#22D3EE', dark: '#0891B2' },
                         arena: { bg: '#0A0A0F', card: '#111118', border: '#1E1E2E', accent: '#8B5CF6' },
+                        attack: { DEFAULT: '#EF4444', light: '#F87171', dark: '#DC2626' },
                     }
                 }
             }
@@ -29,17 +30,18 @@
         body { background: #0A0A0F; }
         .glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); }
         .glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.15); }
+        .glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2); }
         .typing-cursor::after { content: '▊'; animation: blink 0.8s infinite; color: currentColor; opacity: 0.7; }
         @keyframes blink { 0%, 100% { opacity: 0.7; } 50% { opacity: 0; } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .fade-up { animation: fadeUp 0.5s ease-out forwards; }
-        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2); opacity: 0; } }
-        .pulse-ring { animation: pulse-ring 1.5s ease-out infinite; }
         .prose-debate { line-height: 1.75; }
         .prose-debate p { margin-bottom: 0.75em; }
         .scrollbar-thin::-webkit-scrollbar { width: 4px; }
         .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        .shimmer { background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.05) 50%, transparent 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
     </style>
 </head>
 <body class="text-gray-100 min-h-screen font-sans">
@@ -54,10 +56,11 @@
                     </svg>
                 </div>
                 <span class="text-lg font-bold tracking-tight">AI Debate <span class="text-arena-accent">Arena</span></span>
+                <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">v2</span>
             </div>
             <div class="flex items-center gap-2 text-xs text-gray-500 font-mono">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Powered by <a href="https://prysmai.manus.space" target="_blank" class="text-cyan-400 hover:text-cyan-300 ml-1">PrysmAI</a>
+                Powered by <a href="https://prysmai.io" target="_blank" class="text-cyan-400 hover:text-cyan-300 ml-1">PrysmAI</a>
             </div>
         </div>
     </header>
@@ -67,22 +70,22 @@
 
         <!-- ── START SCREEN ── -->
         <div id="start-screen" class="fade-up">
-            <div class="text-center max-w-2xl mx-auto pt-16 pb-12">
+            <div class="text-center max-w-2xl mx-auto pt-12 pb-8">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border border-arena-accent/30 bg-arena-accent/10 text-arena-accent mb-6">
                     <span class="w-1.5 h-1.5 rounded-full bg-arena-accent"></span>
-                    GPT-4o Mini vs Claude Sonnet 4
+                    GPT-4o Mini vs Claude Sonnet 4 — 10 Rounds + Security Probes
                 </div>
                 <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
                     Two AIs enter.<br>
                     <span class="bg-gradient-to-r from-gpt to-claude bg-clip-text text-transparent">One argument wins.</span>
                 </h1>
-                <p class="text-gray-400 text-lg mb-10 max-w-lg mx-auto">
-                    Pick a topic. Watch GPT-4o Mini and Claude Sonnet 4 debate it live. 
-                    Then see inside their responses with PrysmAI's explainability engine.
+                <p class="text-gray-400 text-lg mb-8 max-w-lg mx-auto">
+                    10 rounds of debate including adversarial prompt injection attacks. 
+                    Watch how each model handles jailbreaks, role hijacking, and data exfiltration attempts — all monitored by PrysmAI.
                 </p>
 
                 <!-- Topic Input -->
-                <div class="max-w-lg mx-auto mb-8">
+                <div class="max-w-lg mx-auto mb-6">
                     <div class="flex gap-2">
                         <input 
                             id="topic-input" 
@@ -101,7 +104,7 @@
                 </div>
 
                 <!-- Preset Topics -->
-                <div class="flex flex-wrap justify-center gap-2">
+                <div class="flex flex-wrap justify-center gap-2 mb-10">
                     {% for topic in preset_topics %}
                     <button 
                         onclick="selectTopic('{{ topic }}')"
@@ -113,22 +116,43 @@
                 </div>
             </div>
 
-            <!-- How It Works -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto mt-8 mb-16">
-                <div class="p-5 rounded-xl border border-arena-border bg-arena-card/50 text-center">
-                    <div class="text-2xl mb-2">🎯</div>
-                    <h3 class="font-semibold text-sm mb-1">Pick a Topic</h3>
-                    <p class="text-xs text-gray-500">Choose any topic for the AI models to debate</p>
+            <!-- Round Structure Preview -->
+            <div class="max-w-4xl mx-auto mb-12">
+                <h3 class="text-sm font-semibold text-gray-400 text-center mb-4 font-mono uppercase tracking-wider">10-Round Structure</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {% for num, info in round_types.items() %}
+                    <div class="p-3 rounded-lg border {{ 'border-red-500/30 bg-red-500/5' if info.attack else 'border-arena-border bg-arena-card/50' }} text-center">
+                        <div class="text-[10px] font-mono {{ 'text-red-400' if info.attack else 'text-gray-500' }} mb-1">R{{ num }}</div>
+                        <div class="text-xs font-medium {{ 'text-red-300' if info.attack else 'text-gray-300' }}">{{ info.label }}</div>
+                        {% if info.attack %}
+                        <div class="text-[9px] font-mono text-red-500 mt-1">⚠ {{ info.attack_type | replace('_', ' ') | title }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
                 </div>
-                <div class="p-5 rounded-xl border border-arena-border bg-arena-card/50 text-center">
+            </div>
+
+            <!-- Feature Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-16">
+                <div class="p-4 rounded-xl border border-arena-border bg-arena-card/50 text-center">
                     <div class="text-2xl mb-2">⚔️</div>
-                    <h3 class="font-semibold text-sm mb-1">Watch the Debate</h3>
-                    <p class="text-xs text-gray-500">3 rounds of arguments, rebuttals, and closing statements</p>
+                    <h3 class="font-semibold text-xs mb-1">10 Rounds</h3>
+                    <p class="text-[10px] text-gray-500">Opening, rebuttals, deep dive, closing</p>
                 </div>
-                <div class="p-5 rounded-xl border border-arena-border bg-arena-card/50 text-center">
+                <div class="p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-center">
+                    <div class="text-2xl mb-2">🛡️</div>
+                    <h3 class="font-semibold text-xs text-red-300 mb-1">4 Attack Rounds</h3>
+                    <p class="text-[10px] text-gray-500">Jailbreak, extraction, hijack, exfiltration</p>
+                </div>
+                <div class="p-4 rounded-xl border border-arena-border bg-arena-card/50 text-center">
+                    <div class="text-2xl mb-2">📊</div>
+                    <h3 class="font-semibold text-xs mb-1">Full Observability</h3>
+                    <p class="text-[10px] text-gray-500">21 API calls tracked in PrysmAI</p>
+                </div>
+                <div class="p-4 rounded-xl border border-arena-border bg-arena-card/50 text-center">
                     <div class="text-2xl mb-2">🔍</div>
-                    <h3 class="font-semibold text-sm mb-1">See Inside</h3>
-                    <p class="text-xs text-gray-500">PrysmAI reveals confidence, cost, and hallucination risks</p>
+                    <h3 class="font-semibold text-xs mb-1">Explainability</h3>
+                    <p class="text-[10px] text-gray-500">Confidence heatmaps + hallucination detection</p>
                 </div>
             </div>
         </div>
@@ -136,35 +160,67 @@
         <!-- ── DEBATE SCREEN ── -->
         <div id="debate-screen" class="hidden">
             <!-- Topic Banner -->
-            <div class="text-center mb-6">
+            <div class="text-center mb-4">
                 <div class="text-xs font-mono text-gray-500 mb-1">DEBATING</div>
                 <h2 id="debate-topic" class="text-xl font-bold"></h2>
             </div>
 
-            <!-- Round Indicator -->
-            <div class="flex items-center justify-center gap-3 mb-6">
-                <div id="round-1-dot" class="w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500">1</div>
-                <div class="w-8 h-0.5 bg-arena-border"></div>
-                <div id="round-2-dot" class="w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500">2</div>
-                <div class="w-8 h-0.5 bg-arena-border"></div>
-                <div id="round-3-dot" class="w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500">3</div>
-                <div class="w-8 h-0.5 bg-arena-border"></div>
-                <div id="judge-dot" class="w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500">⚖</div>
+            <!-- Progress Bar -->
+            <div class="max-w-3xl mx-auto mb-4">
+                <div class="flex items-center justify-between text-[10px] font-mono text-gray-500 mb-1">
+                    <span id="progress-label">Round 1 of 10</span>
+                    <span id="progress-pct">0%</span>
+                </div>
+                <div class="w-full h-1.5 bg-arena-border rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full rounded-full transition-all duration-500" style="width: 0%; background: linear-gradient(90deg, #3B82F6, #06B6D4);"></div>
+                </div>
+            </div>
+
+            <!-- Round Indicator Strip -->
+            <div class="flex items-center justify-center gap-1 mb-6 flex-wrap">
+                {% for num in range(1, 11) %}
+                <div id="round-{{ num }}-dot" class="w-7 h-7 rounded-full border {{ 'border-red-500/30' if round_types[num].attack else 'border-arena-border' }} flex items-center justify-center text-[10px] font-mono {{ 'text-red-400' if round_types[num].attack else 'text-gray-500' }}" title="{{ round_types[num].label }}">
+                    {% if round_types[num].attack %}⚠{% else %}{{ num }}{% endif %}
+                </div>
+                {% if num < 10 %}
+                <div class="w-3 h-0.5 bg-arena-border"></div>
+                {% endif %}
+                {% endfor %}
+                <div class="w-3 h-0.5 bg-arena-border"></div>
+                <div id="judge-dot" class="w-7 h-7 rounded-full border-2 border-arena-border flex items-center justify-center text-[10px] font-mono text-gray-500">⚖</div>
+            </div>
+
+            <!-- Current Round Label -->
+            <div id="round-label" class="text-center mb-4">
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border border-arena-border text-gray-400">
+                    <span id="round-label-text">Starting...</span>
+                </span>
+            </div>
+
+            <!-- Attack Warning Banner (hidden by default) -->
+            <div id="attack-banner" class="hidden max-w-3xl mx-auto mb-4">
+                <div class="flex items-center gap-3 px-4 py-2 rounded-lg border border-red-500/30 bg-red-500/5">
+                    <span class="text-red-400 text-lg">🛡️</span>
+                    <div>
+                        <div class="text-xs font-semibold text-red-300">Adversarial Probe Active</div>
+                        <div id="attack-type-label" class="text-[10px] font-mono text-red-400/70">Prompt injection payload injected into this round</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Debate Panels -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <!-- GPT Panel -->
-                <div class="rounded-xl border border-gpt/20 bg-arena-card overflow-hidden glow-blue">
+                <div id="gpt-panel" class="rounded-xl border border-gpt/20 bg-arena-card overflow-hidden glow-blue">
                     <div class="px-4 py-3 border-b border-gpt/10 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-gpt"></div>
                             <span class="font-semibold text-sm text-gpt-light">GPT-4o Mini</span>
-                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">OpenAI</span>
+                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">OpenAI · FOR</span>
                         </div>
                         <div id="gpt-status" class="text-[10px] font-mono text-gray-600">WAITING</div>
                     </div>
-                    <div id="gpt-content" class="p-4 min-h-[200px] max-h-[400px] overflow-y-auto scrollbar-thin prose-debate text-sm text-gray-300">
+                    <div id="gpt-content" class="p-4 min-h-[180px] max-h-[350px] overflow-y-auto scrollbar-thin prose-debate text-sm text-gray-300">
                         <span class="text-gray-600 italic">Waiting for debate to start...</span>
                     </div>
                     <div id="gpt-metrics" class="px-4 py-2 border-t border-gpt/10 hidden">
@@ -177,16 +233,16 @@
                 </div>
 
                 <!-- Claude Panel -->
-                <div class="rounded-xl border border-claude/20 bg-arena-card overflow-hidden glow-cyan">
+                <div id="claude-panel" class="rounded-xl border border-claude/20 bg-arena-card overflow-hidden glow-cyan">
                     <div class="px-4 py-3 border-b border-claude/10 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-claude"></div>
                             <span class="font-semibold text-sm text-claude-light">Claude Sonnet 4</span>
-                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">Anthropic</span>
+                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">Anthropic · AGAINST</span>
                         </div>
                         <div id="claude-status" class="text-[10px] font-mono text-gray-600">WAITING</div>
                     </div>
-                    <div id="claude-content" class="p-4 min-h-[200px] max-h-[400px] overflow-y-auto scrollbar-thin prose-debate text-sm text-gray-300">
+                    <div id="claude-content" class="p-4 min-h-[180px] max-h-[350px] overflow-y-auto scrollbar-thin prose-debate text-sm text-gray-300">
                         <span class="text-gray-600 italic">Waiting for debate to start...</span>
                     </div>
                     <div id="claude-metrics" class="px-4 py-2 border-t border-claude/10 hidden">
@@ -199,160 +255,159 @@
                 </div>
             </div>
 
-            <!-- Round Controls -->
-            <div class="flex justify-center gap-3 mb-6">
-                <button 
-                    id="next-round-btn"
-                    onclick="nextRound()"
-                    class="hidden h-10 px-6 rounded-lg bg-arena-accent text-white font-semibold text-sm hover:bg-arena-accent/80 transition-colors"
-                >
-                    Next Round →
+            <!-- Round History (collapsible) -->
+            <div id="history-panel" class="hidden mb-6">
+                <button onclick="toggleHistory()" class="flex items-center gap-2 text-xs font-mono text-gray-500 hover:text-gray-300 mb-2">
+                    <span id="history-toggle-icon">▶</span> Previous Rounds (<span id="history-count">0</span>)
                 </button>
-                <button 
-                    id="judge-btn"
-                    onclick="getVerdict()"
-                    class="hidden h-10 px-6 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity"
-                >
-                    ⚖️ Get Judge's Verdict
-                </button>
-            </div>
-
-            <!-- Judge Verdict -->
-            <div id="verdict-panel" class="hidden mb-6 fade-up">
-                <div class="rounded-xl border border-amber-500/20 bg-arena-card overflow-hidden">
-                    <div class="px-4 py-3 border-b border-amber-500/10 flex items-center gap-2">
-                        <span class="text-lg">⚖️</span>
-                        <span class="font-semibold text-sm text-amber-400">Judge's Verdict</span>
-                        <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded ml-auto">NON-STREAMING</span>
-                    </div>
-                    <div id="verdict-content" class="p-4 text-sm text-gray-300 prose-debate"></div>
-                    <div id="verdict-metrics" class="px-4 py-2 border-t border-amber-500/10">
-                        <div class="flex gap-4 text-[10px] font-mono text-gray-500">
-                            <span>Latency: <span id="verdict-latency" class="text-amber-400">—</span></span>
-                            <span>Tokens: <span id="verdict-tokens" class="text-amber-400">—</span></span>
-                        </div>
-                    </div>
+                <div id="history-content" class="hidden max-h-[300px] overflow-y-auto scrollbar-thin space-y-2">
                 </div>
             </div>
 
-            <!-- PrysmAI Insights Panel -->
+            <!-- Action Buttons -->
+            <div class="flex justify-center gap-3 mb-6">
+                <button id="next-round-btn" class="hidden h-10 px-6 rounded-lg bg-gradient-to-r from-gpt to-claude text-white font-semibold text-sm hover:opacity-90 transition-opacity" onclick="nextRound()">
+                    Next Round →
+                </button>
+                <button id="judge-btn" class="hidden h-10 px-6 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity" onclick="getVerdict()">
+                    ⚖️ Get Judge's Verdict
+                </button>
+                <button id="new-debate-btn" class="hidden h-10 px-6 rounded-lg border border-arena-border text-gray-400 text-sm hover:text-white hover:border-gray-600 transition-colors" onclick="resetDebate()">
+                    New Debate
+                </button>
+            </div>
+
+            <!-- Verdict Panel -->
+            <div id="verdict-panel" class="hidden mb-6 fade-up">
+                <div class="max-w-3xl mx-auto p-6 rounded-xl border border-amber-500/20 bg-amber-500/5">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-xl">⚖️</span>
+                        <h3 class="font-bold text-amber-300">Judge's Verdict</h3>
+                        <span class="text-[10px] font-mono text-gray-500 ml-auto">
+                            <span id="verdict-latency">—</span> · <span id="verdict-tokens">—</span> tokens
+                        </span>
+                    </div>
+                    <p id="verdict-content" class="text-sm text-gray-300 leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- ═══════ INSIGHTS PANEL ═══════ -->
             <div id="insights-panel" class="hidden fade-up">
-                <div class="rounded-xl border border-arena-accent/20 bg-arena-card overflow-hidden">
-                    <div class="px-4 py-3 border-b border-arena-accent/10 flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="w-6 h-6 rounded bg-arena-accent/20 flex items-center justify-center">
-                                <svg class="w-3.5 h-3.5 text-arena-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                                </svg>
-                            </div>
-                            <span class="font-semibold text-sm text-arena-accent">PrysmAI Insights</span>
+                <div class="border-t border-arena-border pt-8 mt-4">
+                    <div class="text-center mb-6">
+                        <div class="text-xs font-mono text-arena-accent mb-1">PRYSM AI INSIGHTS</div>
+                        <h3 class="text-lg font-bold">Debate Analytics</h3>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                        <div class="p-4 rounded-lg border border-arena-border bg-arena-card text-center">
+                            <div class="text-[10px] font-mono text-gray-500 mb-1">TOTAL API CALLS</div>
+                            <div id="insight-total-calls" class="text-2xl font-bold text-arena-accent">—</div>
                         </div>
-                        <a href="https://prysmai.manus.space/dashboard" target="_blank" class="text-[10px] font-mono text-arena-accent hover:text-arena-accent/80">
+                        <div class="p-4 rounded-lg border border-arena-border bg-arena-card text-center">
+                            <div class="text-[10px] font-mono text-gray-500 mb-1">TOTAL TOKENS</div>
+                            <div id="insight-total-tokens" class="text-2xl font-bold text-white">—</div>
+                        </div>
+                        <div class="p-4 rounded-lg border border-arena-border bg-arena-card text-center">
+                            <div class="text-[10px] font-mono text-gray-500 mb-1">ATTACK ROUNDS</div>
+                            <div class="text-2xl font-bold text-red-400">4</div>
+                        </div>
+                        <div class="p-4 rounded-lg border border-arena-border bg-arena-card text-center">
+                            <div class="text-[10px] font-mono text-gray-500 mb-1">SECURITY EVENTS</div>
+                            <div id="insight-security-events" class="text-2xl font-bold text-amber-400">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Model Comparison -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <!-- GPT Stats -->
+                        <div class="p-4 rounded-lg border border-gpt/20 bg-arena-card">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-2.5 h-2.5 rounded-full bg-gpt"></div>
+                                <span class="text-sm font-semibold text-gpt-light">GPT-4o Mini</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 text-center">
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Total Latency</div>
+                                    <div id="insight-gpt-latency" class="text-sm font-bold text-gpt-light">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Avg TTFT</div>
+                                    <div id="insight-gpt-ttft" class="text-sm font-bold text-gpt-light">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Total Tokens</div>
+                                    <div id="insight-gpt-tokens" class="text-sm font-bold text-gpt-light">—</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Claude Stats -->
+                        <div class="p-4 rounded-lg border border-claude/20 bg-arena-card">
+                            <div class="flex items-center gap-2 mb-3">
+                                <div class="w-2.5 h-2.5 rounded-full bg-claude"></div>
+                                <span class="text-sm font-semibold text-claude-light">Claude Sonnet 4</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3 text-center">
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Total Latency</div>
+                                    <div id="insight-claude-latency" class="text-sm font-bold text-claude-light">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Avg TTFT</div>
+                                    <div id="insight-claude-ttft" class="text-sm font-bold text-claude-light">—</div>
+                                </div>
+                                <div>
+                                    <div class="text-[10px] font-mono text-gray-500">Total Tokens</div>
+                                    <div id="insight-claude-tokens" class="text-sm font-bold text-claude-light">—</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CTA -->
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500 mb-3">All 21 API calls were traced through PrysmAI. View confidence heatmaps, hallucination detection, security alerts, and cost breakdown in the dashboard.</p>
+                        <a href="https://prysmai.io/dashboard" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-arena-accent/10 border border-arena-accent/30 text-arena-accent text-sm font-medium hover:bg-arena-accent/20 transition-colors">
                             View Full Dashboard →
                         </a>
                     </div>
-                    <div class="p-4">
-                        <!-- Metrics Comparison -->
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="text-[10px] font-mono text-gray-500 mb-1">TOTAL LATENCY</div>
-                                <div class="flex items-end gap-2">
-                                    <span class="text-lg font-bold text-gpt-light" id="insight-gpt-latency">—</span>
-                                    <span class="text-xs text-gray-600">vs</span>
-                                    <span class="text-lg font-bold text-claude-light" id="insight-claude-latency">—</span>
-                                </div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="text-[10px] font-mono text-gray-500 mb-1">AVG TTFT</div>
-                                <div class="flex items-end gap-2">
-                                    <span class="text-lg font-bold text-gpt-light" id="insight-gpt-ttft">—</span>
-                                    <span class="text-xs text-gray-600">vs</span>
-                                    <span class="text-lg font-bold text-claude-light" id="insight-claude-ttft">—</span>
-                                </div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="text-[10px] font-mono text-gray-500 mb-1">TOTAL TOKENS</div>
-                                <div class="flex items-end gap-2">
-                                    <span class="text-lg font-bold text-gpt-light" id="insight-gpt-tokens">—</span>
-                                    <span class="text-xs text-gray-600">vs</span>
-                                    <span class="text-lg font-bold text-claude-light" id="insight-claude-tokens">—</span>
-                                </div>
-                            </div>
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="text-[10px] font-mono text-gray-500 mb-1">API CALLS</div>
-                                <div class="text-lg font-bold text-arena-accent" id="insight-total-calls">—</div>
-                                <div class="text-[10px] text-gray-600">All traced by PrysmAI</div>
-                            </div>
-                        </div>
-
-                        <!-- Feature Highlights -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-sm">🎯</span>
-                                    <span class="text-xs font-semibold text-gray-300">Multi-Provider Routing</span>
-                                </div>
-                                <p class="text-[11px] text-gray-500">One <code class="text-arena-accent">sk-prysm-*</code> key routed to both OpenAI and Anthropic based on model name. Zero config.</p>
-                            </div>
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-sm">📊</span>
-                                    <span class="text-xs font-semibold text-gray-300">Full Observability</span>
-                                </div>
-                                <p class="text-[11px] text-gray-500">Every request logged with latency, tokens, cost, and full prompt/completion. View traces in the PrysmAI dashboard.</p>
-                            </div>
-                            <div class="p-3 rounded-lg bg-arena-bg border border-arena-border">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-sm">🔬</span>
-                                    <span class="text-xs font-semibold text-gray-300">Explainability</span>
-                                </div>
-                                <p class="text-[11px] text-gray-500">Confidence heatmaps, hallucination detection, and "Why did it say that?" — see inside every response.</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
-            </div>
-
-            <!-- New Debate Button -->
-            <div id="new-debate-btn" class="hidden text-center mt-6 mb-12">
-                <button 
-                    onclick="resetDebate()"
-                    class="h-10 px-6 rounded-lg border border-arena-border text-gray-400 hover:text-white hover:border-gray-600 text-sm transition-colors"
-                >
-                    ← Start New Debate
-                </button>
             </div>
         </div>
     </main>
 
     <!-- ═══════ FOOTER ═══════ -->
-    <footer class="border-t border-arena-border/30 mt-16">
-        <div class="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between text-xs text-gray-600">
-            <span>Built with <a href="https://prysmai.manus.space" target="_blank" class="text-cyan-500 hover:text-cyan-400">PrysmAI</a> — AI Observability for builders who go deeper</span>
-            <span class="font-mono">v1.0.0</span>
+    <footer class="border-t border-arena-border/30 mt-16 py-6">
+        <div class="max-w-7xl mx-auto px-6 flex items-center justify-between text-xs text-gray-600">
+            <span>Built with <a href="https://prysmai.io" target="_blank" class="text-cyan-400/60 hover:text-cyan-400">PrysmAI</a></span>
+            <span class="font-mono">10 rounds · 2 models · 4 attacks · 1 key</span>
         </div>
     </footer>
 
-    <!-- ═══════ JAVASCRIPT ═══════ -->
     <script>
-        // ── State ──
+        // ═══════ STATE ═══════
         let sessionId = null;
         let currentRound = 0;
-        const totalRounds = 3;
-        const metrics = {
+        let totalRounds = 10;
+        let roundTypes = {};
+        let isRunning = false;
+        let metrics = {
             gpt: { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 },
             claude: { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 },
         };
+        let roundHistory = []; // stores {round, label, type, isAttack, gpt, claude}
 
-        // ── Topic Selection ──
+        // ═══════ TOPIC SELECTION ═══════
         function selectTopic(topic) {
             document.getElementById('topic-input').value = topic;
         }
 
-        // ── Start Debate ──
+        // ═══════ START DEBATE ═══════
         async function startDebate() {
             const topic = document.getElementById('topic-input').value.trim();
-            if (!topic) return;
+            if (!topic) return alert('Please enter a debate topic.');
 
             const btn = document.getElementById('start-btn');
             btn.textContent = 'Starting...';
@@ -365,23 +420,19 @@
                     body: JSON.stringify({ topic }),
                 });
                 const data = await res.json();
-                
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-
                 sessionId = data.session_id;
-                document.getElementById('debate-topic').textContent = `"${topic}"`;
-                
+                totalRounds = data.total_rounds;
+                roundTypes = data.round_types || {};
+
                 // Switch screens
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('debate-screen').classList.remove('hidden');
-                document.getElementById('debate-screen').classList.add('fade-up');
+                document.getElementById('debate-topic').textContent = topic;
 
                 // Start round 1
                 currentRound = 1;
                 runRound(1);
+
             } catch (err) {
                 alert('Failed to start debate: ' + err.message);
             } finally {
@@ -390,161 +441,286 @@
             }
         }
 
-        // ── Run a Debate Round ──
+        // ═══════ RUN ROUND ═══════
         function runRound(roundNum) {
-            // Update round dots
+            isRunning = true;
+            const roundInfo = roundTypes[String(roundNum)] || {};
+            const isAttack = roundInfo.attack || false;
+            const attackType = roundInfo.attack_type || '';
+            const roundLabel = roundInfo.label || `Round ${roundNum}`;
+
+            // Update progress
+            updateProgress(roundNum);
+
+            // Update round label
+            const labelEl = document.getElementById('round-label-text');
+            labelEl.textContent = `Round ${roundNum}: ${roundLabel}`;
+            
+            // Update round label styling for attack rounds
+            const labelContainer = labelEl.parentElement;
+            if (isAttack) {
+                labelContainer.className = 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border border-red-500/30 text-red-300 bg-red-500/5';
+            } else {
+                labelContainer.className = 'inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border border-arena-border text-gray-400';
+            }
+
+            // Show/hide attack banner
+            const banner = document.getElementById('attack-banner');
+            if (isAttack) {
+                banner.classList.remove('hidden');
+                document.getElementById('attack-type-label').textContent = 
+                    `Attack type: ${attackType.replace(/_/g, ' ')} — prompt injection payload injected`;
+                // Red glow on panels
+                document.getElementById('gpt-panel').classList.add('glow-red');
+                document.getElementById('claude-panel').classList.add('glow-red');
+            } else {
+                banner.classList.add('hidden');
+                document.getElementById('gpt-panel').classList.remove('glow-red');
+                document.getElementById('claude-panel').classList.remove('glow-red');
+            }
+
+            // Update current round dot
             const dot = document.getElementById(`round-${roundNum}-dot`);
-            dot.classList.remove('border-arena-border', 'text-gray-500');
-            dot.classList.add('border-arena-accent', 'text-arena-accent', 'bg-arena-accent/10');
-            
-            // Add pulsing ring
-            dot.innerHTML = `<span class="absolute w-8 h-8 rounded-full border border-arena-accent/50 pulse-ring"></span>${roundNum}`;
-            dot.classList.add('relative');
+            if (isAttack) {
+                dot.classList.add('border-red-500', 'text-red-300', 'bg-red-500/10');
+            } else {
+                dot.classList.add('border-arena-accent', 'text-arena-accent', 'bg-arena-accent/10');
+            }
 
-            // Reset content for this round
-            const roundLabel = roundNum === 1 ? 'Opening Argument' : roundNum === 2 ? 'Rebuttal' : 'Closing Statement';
-            
-            document.getElementById('gpt-content').innerHTML = `<div class="text-[10px] font-mono text-gpt/50 mb-2">ROUND ${roundNum} — ${roundLabel}</div>`;
-            document.getElementById('claude-content').innerHTML = `<div class="text-[10px] font-mono text-claude/50 mb-2">ROUND ${roundNum} — ${roundLabel}</div>`;
-            document.getElementById('gpt-status').textContent = 'WAITING';
-            document.getElementById('claude-status').textContent = 'WAITING';
-
-            // Hide controls during round
+            // Hide buttons while running
             document.getElementById('next-round-btn').classList.add('hidden');
             document.getElementById('judge-btn').classList.add('hidden');
 
+            // Reset content for this round
+            document.getElementById('gpt-content').innerHTML = '';
+            document.getElementById('claude-content').innerHTML = '';
+            document.getElementById('gpt-status').textContent = 'WAITING';
+            document.getElementById('claude-status').textContent = 'WAITING';
+
+            // Connect SSE
             const evtSource = new EventSource(`/api/debate/${sessionId}/round/${roundNum}`);
             let currentModel = null;
 
             evtSource.addEventListener('round_start', (e) => {
-                // Round started
+                const data = JSON.parse(e.data);
             });
 
             evtSource.addEventListener('model_start', (e) => {
                 const data = JSON.parse(e.data);
                 currentModel = data.model;
-                document.getElementById(`${data.model}-status`).textContent = 'STREAMING';
-                document.getElementById(`${data.model}-status`).classList.add('text-emerald-400');
+                const statusEl = document.getElementById(`${data.model}-status`);
+                statusEl.textContent = 'STREAMING';
+                statusEl.classList.add('text-emerald-400');
                 
-                // Add typing cursor
                 const contentEl = document.getElementById(`${data.model}-content`);
-                contentEl.innerHTML += '<span class="typing-cursor"></span>';
+                contentEl.innerHTML = '<span class="typing-cursor"></span>';
             });
 
             evtSource.addEventListener('token', (e) => {
                 const data = JSON.parse(e.data);
                 const contentEl = document.getElementById(`${data.model}-content`);
-                
                 // Remove cursor, add token, re-add cursor
-                const cursor = contentEl.querySelector('.typing-cursor');
-                if (cursor) cursor.remove();
-                
-                contentEl.innerHTML += escapeHtml(data.content);
-                contentEl.innerHTML += '<span class="typing-cursor"></span>';
-                
-                // Auto-scroll
+                contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '') + 
+                    escapeHtml(data.content) + '<span class="typing-cursor"></span>';
                 contentEl.scrollTop = contentEl.scrollHeight;
             });
 
             evtSource.addEventListener('done', (e) => {
                 const data = JSON.parse(e.data);
-                const contentEl = document.getElementById(`${data.model}-content`);
+                const model = data.model;
                 
                 // Remove cursor
-                const cursor = contentEl.querySelector('.typing-cursor');
-                if (cursor) cursor.remove();
+                const contentEl = document.getElementById(`${model}-content`);
+                contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '');
 
                 // Update status
-                document.getElementById(`${data.model}-status`).textContent = 'DONE';
-                document.getElementById(`${data.model}-status`).classList.remove('text-emerald-400');
-                document.getElementById(`${data.model}-status`).classList.add('text-gray-500');
+                const statusEl = document.getElementById(`${model}-status`);
+                statusEl.textContent = 'DONE';
+                statusEl.classList.remove('text-emerald-400');
+                statusEl.classList.add('text-gray-400');
 
                 // Show metrics
-                document.getElementById(`${data.model}-metrics`).classList.remove('hidden');
-                document.getElementById(`${data.model}-latency`).textContent = `${(data.latency_ms / 1000).toFixed(1)}s`;
-                document.getElementById(`${data.model}-ttft`).textContent = `${Math.round(data.ttft_ms)}ms`;
-                document.getElementById(`${data.model}-tokens`).textContent = data.tokens || '—';
+                document.getElementById(`${model}-metrics`).classList.remove('hidden');
+                document.getElementById(`${model}-latency`).textContent = `${(data.latency_ms / 1000).toFixed(1)}s`;
+                document.getElementById(`${model}-ttft`).textContent = `${Math.round(data.ttft_ms)}ms`;
+                document.getElementById(`${model}-tokens`).textContent = data.tokens || '—';
 
                 // Accumulate metrics
-                metrics[data.model].totalLatency += data.latency_ms;
-                metrics[data.model].totalTtft += data.ttft_ms;
-                metrics[data.model].totalTokens += (data.tokens || 0);
-                metrics[data.model].rounds += 1;
-            });
-
-            evtSource.addEventListener('error', (e) => {
-                // Check if it's a real error or just SSE closing
-                if (evtSource.readyState === EventSource.CLOSED) return;
-                try {
-                    const data = JSON.parse(e.data);
-                    const contentEl = document.getElementById(`${data.model}-content`);
-                    contentEl.innerHTML += `<div class="text-red-400 mt-2 text-xs">Error: ${escapeHtml(data.error)}</div>`;
-                } catch {}
+                metrics[model].totalLatency += data.latency_ms;
+                metrics[model].totalTtft += data.ttft_ms;
+                metrics[model].totalTokens += (data.tokens || 0);
+                metrics[model].rounds++;
             });
 
             evtSource.addEventListener('round_end', (e) => {
                 evtSource.close();
-                
-                // Update round dot — completed
-                dot.innerHTML = `${roundNum}`;
-                dot.classList.remove('border-arena-accent', 'text-arena-accent', 'bg-arena-accent/10');
-                dot.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+                const data = JSON.parse(e.data);
+                isRunning = false;
 
-                currentRound = roundNum;
+                // Save to history
+                roundHistory.push({
+                    round: roundNum,
+                    label: roundLabel,
+                    type: roundInfo.type || 'unknown',
+                    isAttack: isAttack,
+                    attackType: attackType,
+                    gpt: data.gpt_content,
+                    claude: data.claude_content,
+                });
+                updateHistoryPanel();
+
+                // Mark round dot as complete
+                if (isAttack) {
+                    dot.classList.add('bg-red-500/20');
+                } else {
+                    dot.classList.remove('bg-arena-accent/10');
+                    dot.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+                    dot.classList.remove('border-arena-accent', 'text-arena-accent');
+                }
 
                 // Show appropriate button
                 if (roundNum < totalRounds) {
                     document.getElementById('next-round-btn').classList.remove('hidden');
+                    document.getElementById('next-round-btn').textContent = `Round ${roundNum + 1} →`;
                 } else {
                     document.getElementById('judge-btn').classList.remove('hidden');
                 }
             });
 
+            evtSource.addEventListener('security_blocked', (e) => {
+                const data = JSON.parse(e.data);
+                const model = data.model;
+                const contentEl = document.getElementById(`${model}-content`);
+                contentEl.innerHTML = `
+                    <div class="border border-red-500/30 bg-red-500/10 rounded-lg p-4 mt-2">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                            <span class="text-red-400 font-semibold text-sm font-mono">SECURITY BLOCKED</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-mono ${
+                                data.threat_level === 'high' ? 'bg-red-500/20 text-red-300' :
+                                data.threat_level === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                'bg-orange-500/20 text-orange-300'
+                            }">${data.threat_level.toUpperCase()} · Score ${data.threat_score}</span>
+                        </div>
+                        <p class="text-red-300/80 text-sm">PrysmAI detected a prompt injection attack and blocked this request before it reached the model.</p>
+                        <p class="text-gray-400 text-xs mt-2 font-mono">${data.details}</p>
+                    </div>
+                `;
+                // Update status
+                const statusEl = document.getElementById(`${model}-status`);
+                statusEl.textContent = 'BLOCKED';
+                statusEl.classList.remove('text-emerald-400');
+                statusEl.classList.add('text-red-400');
+            });
+
+            evtSource.addEventListener('error_event', (e) => {
+                const data = JSON.parse(e.data);
+                console.error('Round error:', data);
+                isRunning = false;
+            });
+
             evtSource.onerror = () => {
                 if (evtSource.readyState === EventSource.CLOSED) return;
                 evtSource.close();
+                isRunning = false;
             };
         }
 
-        // ── Next Round ──
+        // ═══════ PROGRESS ═══════
+        function updateProgress(roundNum) {
+            const pct = Math.round((roundNum / totalRounds) * 100);
+            document.getElementById('progress-bar').style.width = `${pct}%`;
+            document.getElementById('progress-label').textContent = `Round ${roundNum} of ${totalRounds}`;
+            document.getElementById('progress-pct').textContent = `${pct}%`;
+        }
+
+        // ═══════ HISTORY PANEL ═══════
+        function updateHistoryPanel() {
+            const panel = document.getElementById('history-panel');
+            const count = document.getElementById('history-count');
+            const content = document.getElementById('history-content');
+            
+            if (roundHistory.length > 1) {
+                panel.classList.remove('hidden');
+            }
+            count.textContent = roundHistory.length - 1; // exclude current
+
+            // Build history HTML (all except the latest round which is displayed live)
+            let html = '';
+            for (let i = 0; i < roundHistory.length - 1; i++) {
+                const r = roundHistory[i];
+                const borderColor = r.isAttack ? 'border-red-500/20' : 'border-arena-border';
+                const badge = r.isAttack ? `<span class="text-[9px] font-mono text-red-400 border border-red-500/30 px-1 py-0.5 rounded">⚠ ${r.attackType.replace(/_/g, ' ')}</span>` : '';
+                html += `
+                    <div class="p-3 rounded-lg border ${borderColor} bg-arena-card/30">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-[10px] font-mono text-gray-500">R${r.round}</span>
+                            <span class="text-xs font-medium text-gray-400">${r.label}</span>
+                            ${badge}
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
+                            <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gpt.substring(0, 100)}...</div>
+                            <div><span class="text-claude-light font-medium">Claude:</span> ${r.claude.substring(0, 100)}...</div>
+                        </div>
+                    </div>
+                `;
+            }
+            content.innerHTML = html;
+        }
+
+        function toggleHistory() {
+            const content = document.getElementById('history-content');
+            const icon = document.getElementById('history-toggle-icon');
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.textContent = '▼';
+            } else {
+                content.classList.add('hidden');
+                icon.textContent = '▶';
+            }
+        }
+
+        // ═══════ NEXT ROUND ═══════
         function nextRound() {
             currentRound++;
             runRound(currentRound);
         }
 
-        // ── Get Verdict ──
+        // ═══════ GET VERDICT ═══════
         async function getVerdict() {
             const btn = document.getElementById('judge-btn');
             btn.textContent = '⚖️ Judging...';
             btn.disabled = true;
 
-            // Update judge dot
             const judgeDot = document.getElementById('judge-dot');
             judgeDot.classList.remove('border-arena-border', 'text-gray-500');
             judgeDot.classList.add('border-amber-500', 'text-amber-400', 'bg-amber-500/10');
+
+            // Update progress to 100%
+            document.getElementById('progress-bar').style.width = '100%';
+            document.getElementById('progress-label').textContent = 'Judging...';
+            document.getElementById('progress-pct').textContent = '100%';
+
+            // Hide attack banner
+            document.getElementById('attack-banner').classList.add('hidden');
 
             try {
                 const res = await fetch(`/api/debate/${sessionId}/judge`, { method: 'POST' });
                 const data = await res.json();
 
-                // Show verdict
                 document.getElementById('verdict-panel').classList.remove('hidden');
                 document.getElementById('verdict-content').textContent = data.content;
                 document.getElementById('verdict-latency').textContent = `${(data.latency_ms / 1000).toFixed(1)}s`;
                 document.getElementById('verdict-tokens').textContent = data.tokens || '—';
 
-                // Update judge dot — completed
                 judgeDot.classList.remove('border-amber-500', 'text-amber-400', 'bg-amber-500/10');
                 judgeDot.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
 
-                // Show insights panel
+                document.getElementById('progress-label').textContent = 'Complete';
+
                 updateInsights();
                 document.getElementById('insights-panel').classList.remove('hidden');
-                
-                // Show new debate button
                 document.getElementById('new-debate-btn').classList.remove('hidden');
-                
-                // Hide judge button
                 btn.classList.add('hidden');
 
             } catch (err) {
@@ -555,7 +731,7 @@
             }
         }
 
-        // ── Update Insights ──
+        // ═══════ UPDATE INSIGHTS ═══════
         function updateInsights() {
             const gpt = metrics.gpt;
             const claude = metrics.claude;
@@ -569,26 +745,38 @@
             document.getElementById('insight-gpt-tokens').textContent = gpt.totalTokens || '—';
             document.getElementById('insight-claude-tokens').textContent = claude.totalTokens || '—';
             
-            // Total API calls = 3 rounds × 2 models + 1 judge = 7
+            // Total API calls = 10 rounds × 2 models + 1 judge = 21
             document.getElementById('insight-total-calls').textContent = `${(gpt.rounds + claude.rounds + 1)}`;
+            document.getElementById('insight-total-tokens').textContent = `${gpt.totalTokens + claude.totalTokens}`;
+            
+            // Security events = 4 attack rounds × 2 models = 8 prompts with injections
+            document.getElementById('insight-security-events').textContent = '8';
         }
 
-        // ── Reset ──
+        // ═══════ RESET ═══════
         function resetDebate() {
             sessionId = null;
             currentRound = 0;
+            roundHistory = [];
             metrics.gpt = { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 };
             metrics.claude = { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 };
 
             // Reset round dots
-            for (let i = 1; i <= 3; i++) {
+            for (let i = 1; i <= 10; i++) {
                 const dot = document.getElementById(`round-${i}-dot`);
-                dot.className = 'w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500';
-                dot.innerHTML = `${i}`;
+                const info = roundTypes[String(i)] || {};
+                const isAttack = info.attack || false;
+                dot.className = `w-7 h-7 rounded-full border ${isAttack ? 'border-red-500/30' : 'border-arena-border'} flex items-center justify-center text-[10px] font-mono ${isAttack ? 'text-red-400' : 'text-gray-500'}`;
+                dot.innerHTML = isAttack ? '⚠' : `${i}`;
             }
             const judgeDot = document.getElementById('judge-dot');
-            judgeDot.className = 'w-8 h-8 rounded-full border-2 border-arena-border flex items-center justify-center text-xs font-mono text-gray-500';
+            judgeDot.className = 'w-7 h-7 rounded-full border-2 border-arena-border flex items-center justify-center text-[10px] font-mono text-gray-500';
             judgeDot.innerHTML = '⚖';
+
+            // Reset progress
+            document.getElementById('progress-bar').style.width = '0%';
+            document.getElementById('progress-label').textContent = 'Round 1 of 10';
+            document.getElementById('progress-pct').textContent = '0%';
 
             // Hide panels
             document.getElementById('verdict-panel').classList.add('hidden');
@@ -596,12 +784,16 @@
             document.getElementById('new-debate-btn').classList.add('hidden');
             document.getElementById('next-round-btn').classList.add('hidden');
             document.getElementById('judge-btn').classList.add('hidden');
+            document.getElementById('attack-banner').classList.add('hidden');
+            document.getElementById('history-panel').classList.add('hidden');
 
             // Reset content
             document.getElementById('gpt-content').innerHTML = '<span class="text-gray-600 italic">Waiting for debate to start...</span>';
             document.getElementById('claude-content').innerHTML = '<span class="text-gray-600 italic">Waiting for debate to start...</span>';
             document.getElementById('gpt-metrics').classList.add('hidden');
             document.getElementById('claude-metrics').classList.add('hidden');
+            document.getElementById('gpt-panel').classList.remove('glow-red');
+            document.getElementById('claude-panel').classList.remove('glow-red');
 
             // Switch screens
             document.getElementById('debate-screen').classList.add('hidden');
@@ -609,14 +801,13 @@
             document.getElementById('topic-input').value = '';
         }
 
-        // ── Utility ──
+        // ═══════ UTILITY ═══════
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
-        // ── Enter key to start ──
         document.getElementById('topic-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') startDebate();
         });
