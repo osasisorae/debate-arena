@@ -500,6 +500,9 @@
             // Connect SSE
             const evtSource = new EventSource(`/api/debate/${sessionId}/round/${roundNum}`);
             let currentModel = null;
+            // Track full content from done events (round_end only has truncated previews)
+            const roundContent = { gpt: '', claude: '' };
+            const blockedModels = new Set();
 
             evtSource.addEventListener('round_start', (e) => {
                 const data = JSON.parse(e.data);
@@ -526,46 +529,60 @@
             });
 
             evtSource.addEventListener('done', (e) => {
+                try {
                 const data = JSON.parse(e.data);
                 const model = data.model;
                 
-                // Remove cursor
-                const contentEl = document.getElementById(`${model}-content`);
-                contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '');
+                // Save full content for history
+                roundContent[model] = data.content || '';
+                if (data.blocked) blockedModels.add(model);
+
+                // Don't touch DOM for blocked models — security_blocked already rendered
+                if (!blockedModels.has(model)) {
+                    // Remove cursor
+                    const contentEl = document.getElementById(`${model}-content`);
+                    contentEl.innerHTML = contentEl.innerHTML.replace('<span class="typing-cursor"></span>', '');
+                }
 
                 // Update status
                 const statusEl = document.getElementById(`${model}-status`);
-                statusEl.textContent = 'DONE';
-                statusEl.classList.remove('text-emerald-400');
-                statusEl.classList.add('text-gray-400');
+                if (!data.blocked) {
+                    statusEl.textContent = 'DONE';
+                    statusEl.classList.remove('text-emerald-400');
+                    statusEl.classList.add('text-gray-400');
+                }
 
-                // Show metrics
+                // Show metrics (even for blocked — shows latency of the block)
                 document.getElementById(`${model}-metrics`).classList.remove('hidden');
                 document.getElementById(`${model}-latency`).textContent = `${(data.latency_ms / 1000).toFixed(1)}s`;
-                document.getElementById(`${model}-ttft`).textContent = `${Math.round(data.ttft_ms)}ms`;
-                document.getElementById(`${model}-tokens`).textContent = data.tokens || '—';
+                document.getElementById(`${model}-ttft`).textContent = data.blocked ? 'N/A' : `${Math.round(data.ttft_ms)}ms`;
+                document.getElementById(`${model}-tokens`).textContent = data.blocked ? '0' : (data.tokens || '—');
 
                 // Accumulate metrics
                 metrics[model].totalLatency += data.latency_ms;
                 metrics[model].totalTtft += data.ttft_ms;
                 metrics[model].totalTokens += (data.tokens || 0);
                 metrics[model].rounds++;
+                } catch (err) { console.error('done parse error:', err); }
             });
 
             evtSource.addEventListener('round_end', (e) => {
                 evtSource.close();
+                try {
                 const data = JSON.parse(e.data);
                 isRunning = false;
 
-                // Save to history
+                // Use full content from done events, fall back to round_end preview
                 roundHistory.push({
                     round: roundNum,
                     label: roundLabel,
                     type: roundInfo.type || 'unknown',
                     isAttack: isAttack,
                     attackType: attackType,
-                    gpt: data.gpt_content,
-                    claude: data.claude_content,
+                    gpt: roundContent.gpt || data.gpt_content || '',
+                    claude: roundContent.claude || data.claude_content || '',
+                    gptBlocked: blockedModels.has('gpt'),
+                    claudeBlocked: blockedModels.has('claude'),
                 });
                 updateHistoryPanel();
 
@@ -585,10 +602,13 @@
                 } else {
                     document.getElementById('judge-btn').classList.remove('hidden');
                 }
+                } catch (err) { console.error('round_end parse error:', err); isRunning = false; }
             });
 
             evtSource.addEventListener('security_blocked', (e) => {
+                try {
                 const data = JSON.parse(e.data);
+                blockedModels.add(data.model);
                 const model = data.model;
                 const contentEl = document.getElementById(`${model}-content`);
                 contentEl.innerHTML = `
@@ -611,6 +631,7 @@
                 statusEl.textContent = 'BLOCKED';
                 statusEl.classList.remove('text-emerald-400');
                 statusEl.classList.add('text-red-400');
+                } catch (err) { console.error('security_blocked parse error:', err); }
             });
 
             evtSource.addEventListener('error_event', (e) => {
@@ -659,8 +680,8 @@
                             ${badge}
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
-                            <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gpt.substring(0, 100)}...</div>
-                            <div><span class="text-claude-light font-medium">Claude:</span> ${r.claude.substring(0, 100)}...</div>
+                            <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gptBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.gpt || '').substring(0, 100)) + '...'}</div>
+                            <div><span class="text-claude-light font-medium">Claude:</span> ${r.claudeBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.claude || '').substring(0, 100)) + '...'}</div>
                         </div>
                     </div>
                 `;

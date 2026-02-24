@@ -459,11 +459,17 @@ def run_debate_round_streaming(
         if chunk["type"] == "done":
             claude_content = chunk["content"]
 
+    # Truncate content in round_end to prevent massive SSE payloads
+    # The full content is already sent via 'done' events per model
+    max_preview = 200
+    gpt_preview = gpt_content[:max_preview] + ("..." if len(gpt_content) > max_preview else "")
+    claude_preview = claude_content[:max_preview] + ("..." if len(claude_content) > max_preview else "")
+
     yield {
         "type": "round_end",
         "round": round_num,
-        "gpt_content": gpt_content,
-        "claude_content": claude_content,
+        "gpt_content": gpt_preview,
+        "claude_content": claude_preview,
         "round_type": round_type,
         "is_attack": is_attack,
     }
