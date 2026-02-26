@@ -85,7 +85,7 @@
                 </p>
 
                 <!-- Topic Input -->
-                <div class="max-w-lg mx-auto mb-6">
+                <div class="max-w-lg mx-auto mb-4">
                     <div class="flex gap-2">
                         <input 
                             id="topic-input" 
@@ -101,6 +101,19 @@
                             Start Debate →
                         </button>
                     </div>
+                </div>
+
+                <!-- Auto-Run Toggle -->
+                <div class="max-w-lg mx-auto mb-6 flex items-center justify-center gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <div class="relative">
+                            <input type="checkbox" id="auto-run-toggle" class="sr-only peer" checked>
+                            <div class="w-9 h-5 bg-arena-border rounded-full peer-checked:bg-arena-accent/60 transition-colors"></div>
+                            <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-gray-300 rounded-full peer-checked:translate-x-4 peer-checked:bg-white transition-transform"></div>
+                        </div>
+                        <span class="text-xs text-gray-400 font-mono">Auto-advance rounds</span>
+                    </label>
+                    <span class="text-[10px] text-gray-600 font-mono">(3s delay between rounds)</span>
                 </div>
 
                 <!-- Preset Topics -->
@@ -208,6 +221,28 @@
                 </div>
             </div>
 
+            <!-- Live Stats Panel -->
+            <div id="live-stats" class="max-w-3xl mx-auto mb-4">
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="p-2.5 rounded-lg border border-arena-border bg-arena-card/50 text-center">
+                        <div class="text-[9px] font-mono text-gray-600 mb-0.5">TOTAL TOKENS</div>
+                        <div id="live-total-tokens" class="text-lg font-bold text-white font-mono">0</div>
+                    </div>
+                    <div class="p-2.5 rounded-lg border border-arena-border bg-arena-card/50 text-center">
+                        <div class="text-[9px] font-mono text-gray-600 mb-0.5">EST. COST</div>
+                        <div id="live-est-cost" class="text-lg font-bold text-emerald-400 font-mono">$0.000</div>
+                    </div>
+                    <div class="p-2.5 rounded-lg border border-arena-border bg-arena-card/50 text-center">
+                        <div class="text-[9px] font-mono text-gray-600 mb-0.5">SECURITY BLOCKS</div>
+                        <div id="live-security-blocks" class="text-lg font-bold text-red-400 font-mono">0</div>
+                    </div>
+                    <div class="p-2.5 rounded-lg border border-arena-border bg-arena-card/50 text-center">
+                        <div class="text-[9px] font-mono text-gray-600 mb-0.5">AVG TTFT</div>
+                        <div id="live-avg-ttft" class="text-lg font-bold text-arena-accent font-mono">—</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Debate Panels -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
                 <!-- GPT Panel -->
@@ -291,6 +326,68 @@
                 </div>
             </div>
 
+            <!-- Debate Summary Card -->
+            <div id="summary-card" class="hidden mb-6 fade-up">
+                <div class="max-w-3xl mx-auto">
+                    <div id="summary-card-inner" class="p-6 rounded-xl border border-arena-accent/30 bg-gradient-to-br from-arena-card via-arena-bg to-arena-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 rounded-md bg-gradient-to-br from-gpt to-claude flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                </div>
+                                <span class="text-sm font-bold">AI Debate Arena</span>
+                            </div>
+                            <span class="text-[9px] font-mono text-gray-600">SESSION <span id="summary-session-id"></span></span>
+                        </div>
+                        <div class="mb-4">
+                            <div class="text-[10px] font-mono text-gray-500 mb-1">TOPIC</div>
+                            <div id="summary-topic" class="text-lg font-bold"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 mb-4">
+                            <div class="p-3 rounded-lg bg-arena-bg/50 border border-arena-border">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-gpt"></div>
+                                    <span class="text-xs font-semibold text-gpt-light">GPT-4o Mini</span>
+                                </div>
+                                <div class="text-[10px] font-mono text-gray-500"><span id="summary-gpt-tokens" class="text-gpt-light">0</span> tokens · <span id="summary-gpt-latency" class="text-gpt-light">0s</span></div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-arena-bg/50 border border-arena-border">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-claude"></div>
+                                    <span class="text-xs font-semibold text-claude-light">Claude Sonnet 4</span>
+                                </div>
+                                <div class="text-[10px] font-mono text-gray-500"><span id="summary-claude-tokens" class="text-claude-light">0</span> tokens · <span id="summary-claude-latency" class="text-claude-light">0s</span></div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 mb-4">
+                            <div class="text-center">
+                                <div class="text-lg font-bold text-white">10</div>
+                                <div class="text-[9px] font-mono text-gray-600">ROUNDS</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="summary-total-tokens" class="text-lg font-bold text-white">0</div>
+                                <div class="text-[9px] font-mono text-gray-600">TOKENS</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="summary-cost" class="text-lg font-bold text-emerald-400">$0.00</div>
+                                <div class="text-[9px] font-mono text-gray-600">EST. COST</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="summary-blocks" class="text-lg font-bold text-red-400">0</div>
+                                <div class="text-[9px] font-mono text-gray-600">BLOCKED</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between pt-3 border-t border-arena-border">
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[9px] font-mono text-gray-600">Built with</span>
+                                <a href="https://prysmai.io" target="_blank" class="text-[9px] font-mono text-cyan-400 hover:text-cyan-300">PrysmAI</a>
+                            </div>
+                            <div id="summary-winner" class="text-xs font-bold text-amber-300"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ═══════ INSIGHTS PANEL ═══════ -->
             <div id="insights-panel" class="hidden fade-up">
                 <div class="border-t border-arena-border pt-8 mt-4">
@@ -368,8 +465,8 @@
 
                     <!-- CTA -->
                     <div class="text-center">
-                        <p class="text-xs text-gray-500 mb-3">All 21 API calls were traced through PrysmAI. View confidence heatmaps, hallucination detection, security alerts, and cost breakdown in the dashboard.</p>
-                        <a href="https://prysmai.io/dashboard" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-arena-accent/10 border border-arena-accent/30 text-arena-accent text-sm font-medium hover:bg-arena-accent/20 transition-colors">
+                        <p class="text-xs text-gray-500 mb-3">All API calls were traced through PrysmAI. View confidence heatmaps, hallucination detection, security alerts, and cost breakdown in the dashboard.</p>
+                        <a id="dashboard-link" href="https://prysmai.io/dashboard" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-arena-accent/10 border border-arena-accent/30 text-arena-accent text-sm font-medium hover:bg-arena-accent/20 transition-colors">
                             View Full Dashboard →
                         </a>
                     </div>
@@ -393,16 +490,43 @@
         let totalRounds = 10;
         let roundTypes = {};
         let isRunning = false;
+        let autoRunEnabled = true;
+        let securityBlockCount = 0;
         let metrics = {
             gpt: { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 },
             claude: { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 },
         };
         let roundHistory = []; // stores {round, label, type, isAttack, gpt, claude}
 
+        // Cost per 1M tokens (approximate)
+        const COST_PER_1M = { gpt: 0.15, claude: 3.00 };
+
+        // ═══════ LIVE STATS ═══════
+        function updateLiveStats() {
+            const totalTokens = metrics.gpt.totalTokens + metrics.claude.totalTokens;
+            const gptCost = (metrics.gpt.totalTokens / 1_000_000) * COST_PER_1M.gpt;
+            const claudeCost = (metrics.claude.totalTokens / 1_000_000) * COST_PER_1M.claude;
+            const totalCost = gptCost + claudeCost;
+            const totalTtftRounds = metrics.gpt.rounds + metrics.claude.rounds;
+            const avgTtft = totalTtftRounds > 0 
+                ? Math.round((metrics.gpt.totalTtft + metrics.claude.totalTtft) / totalTtftRounds) 
+                : 0;
+
+            document.getElementById('live-total-tokens').textContent = totalTokens.toLocaleString();
+            document.getElementById('live-est-cost').textContent = `$${totalCost.toFixed(3)}`;
+            document.getElementById('live-security-blocks').textContent = securityBlockCount;
+            document.getElementById('live-avg-ttft').textContent = avgTtft > 0 ? `${avgTtft}ms` : '—';
+        }
+
         // ═══════ TOPIC SELECTION ═══════
         function selectTopic(topic) {
             document.getElementById('topic-input').value = topic;
         }
+
+        // ═══════ AUTO-RUN TOGGLE ═══════
+        document.getElementById('auto-run-toggle').addEventListener('change', (e) => {
+            autoRunEnabled = e.target.checked;
+        });
 
         // ═══════ START DEBATE ═══════
         async function startDebate() {
@@ -579,6 +703,7 @@
                 metrics[model].totalTtft += data.ttft_ms;
                 metrics[model].totalTokens += (data.tokens || 0);
                 metrics[model].rounds++;
+                updateLiveStats();
                 } catch (err) { console.error('done parse error:', err); }
             });
 
@@ -611,12 +736,34 @@
                     dot.classList.remove('border-arena-accent', 'text-arena-accent');
                 }
 
-                // Show appropriate button
+                // Show appropriate button or auto-advance
                 if (roundNum < totalRounds) {
-                    document.getElementById('next-round-btn').classList.remove('hidden');
-                    document.getElementById('next-round-btn').textContent = `Round ${roundNum + 1} →`;
+                    if (autoRunEnabled) {
+                        // Auto-advance after 3 seconds
+                        document.getElementById('next-round-btn').classList.remove('hidden');
+                        document.getElementById('next-round-btn').textContent = `Auto-advancing in 3s...`;
+                        document.getElementById('next-round-btn').disabled = true;
+                        setTimeout(() => {
+                            document.getElementById('next-round-btn').classList.add('hidden');
+                            document.getElementById('next-round-btn').disabled = false;
+                            nextRound();
+                        }, 3000);
+                    } else {
+                        document.getElementById('next-round-btn').classList.remove('hidden');
+                        document.getElementById('next-round-btn').textContent = `Round ${roundNum + 1} →`;
+                    }
                 } else {
-                    document.getElementById('judge-btn').classList.remove('hidden');
+                    if (autoRunEnabled) {
+                        document.getElementById('judge-btn').classList.remove('hidden');
+                        document.getElementById('judge-btn').textContent = '⚖️ Auto-judging in 3s...';
+                        document.getElementById('judge-btn').disabled = true;
+                        setTimeout(() => {
+                            document.getElementById('judge-btn').disabled = false;
+                            getVerdict();
+                        }, 3000);
+                    } else {
+                        document.getElementById('judge-btn').classList.remove('hidden');
+                    }
                 }
                 } catch (err) { console.error('round_end parse error:', err); isRunning = false; }
             });
@@ -625,6 +772,8 @@
                 try {
                 const data = JSON.parse(e.data);
                 blockedModels.add(data.model);
+                securityBlockCount++;
+                updateLiveStats();
                 const model = data.model;
                 const contentEl = document.getElementById(`${model}-content`);
                 // Remove cursor before replacing content
@@ -762,6 +911,16 @@
                 document.getElementById('new-debate-btn').classList.remove('hidden');
                 btn.classList.add('hidden');
 
+                // Populate summary card
+                populateSummaryCard();
+                document.getElementById('summary-card').classList.remove('hidden');
+
+                // Update dashboard link with session_id
+                const dashLink = document.getElementById('dashboard-link');
+                if (dashLink && sessionId) {
+                    dashLink.href = `https://prysmai.io/dashboard?session=${sessionId}`;
+                }
+
             } catch (err) {
                 alert('Failed to get verdict: ' + err.message);
             } finally {
@@ -788,8 +947,38 @@
             document.getElementById('insight-total-calls').textContent = `${(gpt.rounds + claude.rounds + 1)}`;
             document.getElementById('insight-total-tokens').textContent = `${gpt.totalTokens + claude.totalTokens}`;
             
-            // Security events = 4 attack rounds × 2 models = 8 prompts with injections
-            document.getElementById('insight-security-events').textContent = '8';
+            // Security events counted live
+            document.getElementById('insight-security-events').textContent = securityBlockCount;
+        }
+
+        // ═══════ SUMMARY CARD ═══════
+        function populateSummaryCard() {
+            const gpt = metrics.gpt;
+            const claude = metrics.claude;
+            const totalTokens = gpt.totalTokens + claude.totalTokens;
+            const gptCost = (gpt.totalTokens / 1_000_000) * COST_PER_1M.gpt;
+            const claudeCost = (claude.totalTokens / 1_000_000) * COST_PER_1M.claude;
+            const totalCost = gptCost + claudeCost;
+
+            document.getElementById('summary-session-id').textContent = sessionId ? sessionId.substring(0, 8) : '—';
+            document.getElementById('summary-topic').textContent = document.getElementById('topic-input').value || 'AI Debate';
+            document.getElementById('summary-gpt-tokens').textContent = gpt.totalTokens.toLocaleString();
+            document.getElementById('summary-gpt-latency').textContent = `${(gpt.totalLatency / 1000).toFixed(1)}s`;
+            document.getElementById('summary-claude-tokens').textContent = claude.totalTokens.toLocaleString();
+            document.getElementById('summary-claude-latency').textContent = `${(claude.totalLatency / 1000).toFixed(1)}s`;
+            document.getElementById('summary-total-tokens').textContent = totalTokens.toLocaleString();
+            document.getElementById('summary-cost').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('summary-blocks').textContent = securityBlockCount;
+
+            // Extract winner from verdict
+            const verdict = document.getElementById('verdict-content').textContent;
+            if (verdict.toLowerCase().includes('gpt')) {
+                document.getElementById('summary-winner').textContent = '🏆 GPT-4o Mini Wins';
+            } else if (verdict.toLowerCase().includes('claude')) {
+                document.getElementById('summary-winner').textContent = '🏆 Claude Sonnet 4 Wins';
+            } else {
+                document.getElementById('summary-winner').textContent = '🤝 Draw';
+            }
         }
 
         // ═══════ RESET ═══════
@@ -797,8 +986,10 @@
             sessionId = null;
             currentRound = 0;
             roundHistory = [];
+            securityBlockCount = 0;
             metrics.gpt = { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 };
             metrics.claude = { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 };
+            updateLiveStats();
 
             // Reset round dots
             for (let i = 1; i <= 10; i++) {
@@ -820,6 +1011,7 @@
             // Hide panels
             document.getElementById('verdict-panel').classList.add('hidden');
             document.getElementById('insights-panel').classList.add('hidden');
+            document.getElementById('summary-card').classList.add('hidden');
             document.getElementById('new-debate-btn').classList.add('hidden');
             document.getElementById('next-round-btn').classList.add('hidden');
             document.getElementById('judge-btn').classList.add('hidden');
