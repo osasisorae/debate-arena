@@ -971,11 +971,26 @@
             document.getElementById('summary-blocks').textContent = securityBlockCount;
 
             // Extract winner from verdict
-            const verdict = document.getElementById('verdict-content').textContent;
-            if (verdict.toLowerCase().includes('gpt')) {
-                document.getElementById('summary-winner').textContent = '🏆 GPT-4o Mini Wins';
-            } else if (verdict.toLowerCase().includes('claude')) {
+            const verdict = document.getElementById('verdict-content').textContent.toLowerCase();
+            // Look for explicit winner declarations like "winner: claude" or "winner: gpt"
+            const winnerMatch = verdict.match(/winner[:\s]+([\w\s.-]+?)(?:\s*\(|\s*wins|\s*—|\n|$)/i);
+            let winner = 'draw';
+            if (winnerMatch) {
+                const winnerText = winnerMatch[1].trim().toLowerCase();
+                if (winnerText.includes('claude')) winner = 'claude';
+                else if (winnerText.includes('gpt')) winner = 'gpt';
+            } else {
+                // Fallback: check for "X wins" pattern
+                if (verdict.includes('claude') && verdict.includes('wins') && verdict.indexOf('claude') < verdict.indexOf('wins') && (verdict.indexOf('claude') + 30) > verdict.indexOf('wins')) {
+                    winner = 'claude';
+                } else if (verdict.includes('gpt') && verdict.includes('wins') && verdict.indexOf('gpt') < verdict.indexOf('wins') && (verdict.indexOf('gpt') + 30) > verdict.indexOf('wins')) {
+                    winner = 'gpt';
+                }
+            }
+            if (winner === 'claude') {
                 document.getElementById('summary-winner').textContent = '🏆 Claude Sonnet 4 Wins';
+            } else if (winner === 'gpt') {
+                document.getElementById('summary-winner').textContent = '🏆 GPT-4o Mini Wins';
             } else {
                 document.getElementById('summary-winner').textContent = '🤝 Draw';
             }
