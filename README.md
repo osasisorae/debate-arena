@@ -5,9 +5,9 @@
 [![PrysmAI](https://img.shields.io/badge/Powered%20by-PrysmAI-00e5ff.svg)](https://prysmai.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Two AIs enter. One argument wins. You see everything.**
+**Two models enter. One argument wins. You see everything.**
 
-Watch GPT-4o Mini and Claude Sonnet 4 debate any topic across 10 live-streamed rounds — including 4 adversarial prompt injection attacks — while [PrysmAI](https://prysmai.io) traces every token, blocks threats in real time, and provides full explainability.
+Watch any two Prysm-routed models debate any topic across 10 live-streamed rounds, including 4 adversarial prompt injection attacks, while [PrysmAI](https://prysmai.io) traces every token, blocks threats in real time, and provides full explainability.
 
 ---
 
@@ -15,7 +15,7 @@ Watch GPT-4o Mini and Claude Sonnet 4 debate any topic across 10 live-streamed r
 
 Most AI demos show you the output. This one shows you **what's happening inside**.
 
-The AI Debate Arena is a showcase application built on [PrysmAI](https://prysmai.io) — an AI observability platform with security scanning, confidence analysis, and hallucination detection. It demonstrates what's possible when you route your LLM calls through an observability layer instead of calling providers directly.
+The AI Debate Arena is a showcase application built on [PrysmAI](https://prysmai.io), the control layer for production AI. It demonstrates what changes when you route LLM calls through Prysm instead of wiring provider SDKs directly.
 
 Every API call in this demo is fully traced. Every prompt injection is caught. Every response gets confidence scoring. And you can see it all in the PrysmAI dashboard.
 
@@ -31,7 +31,8 @@ Every API call in this demo is fully traced. Every prompt injection is caught. E
 | **Live Stats Dashboard** | Total tokens, estimated cost, security blocks, and avg TTFT updated in real time |
 | **Auto-Run Mode** | Toggle automatic round advancement (3s delay between rounds) |
 | **Security Scanning** | PrysmAI detects and blocks prompt injection attacks before they reach the model |
-| **Multi-Provider Routing** | One `sk-prysm-*` API key routes to both OpenAI and Anthropic based on model name |
+| **Configurable Model Slots** | Pick the left debater, right debater, and judge independently |
+| **Multi-Provider Routing** | One `sk-prysm-*` API key can route to OpenAI, Anthropic, Gemini, and other Prysm-backed providers |
 | **Post-Debate Summary Card** | Shareable card with topic, stats, winner, and session link |
 | **Dashboard Deep Link** | "View in PrysmAI Dashboard" link filtered by session ID |
 | **Full Observability** | 21 API calls traced with latency, TTFT, tokens, cost, and metadata |
@@ -53,21 +54,21 @@ Every API call in this demo is fully traced. Every prompt injection is caught. E
 ├──────────────────────────────────────────────┤────────────┤
 │                  PrysmAI Python SDK                       │
 │           from prysmai import PrysmClient                 │
-│           client = prysm.openai()                         │
+│           client = prysm.llm()                            │
 │                                                          │
 │  ┌─────────────────────────────────────────────────────┐  │
 │  │              PrysmAI Proxy Layer                     │  │
 │  │                                                     │  │
 │  │  ┌──────────┐  ┌──────────────┐  ┌───────────────┐  │  │
 │  │  │ Security │  │   Routing    │  │  Observability│  │  │
-│  │  │ Scanner  │  │  gpt-* →OAI  │  │  Traces/Cost │  │  │
-│  │  │ PII/Inj. │  │  claude-*→Ant│  │  Confidence   │  │  │
+│  │  │ Scanner  │  │  per model   │  │  Traces/Cost │  │  │
+│  │  │ PII/Inj. │  │  per provider│  │  Confidence   │  │  │
 │  │  └──────────┘  └──────────────┘  └───────────────┘  │  │
 │  └─────────────────────────────────────────────────────┘  │
 │                                                          │
 │  ┌──────────────┐              ┌──────────────────────┐   │
-│  │    OpenAI     │              │     Anthropic        │   │
-│  │  gpt-4o-mini  │              │  claude-sonnet-4     │   │
+│  │   Left model   │              │    Right / Judge      │   │
+│  │  configurable  │              │    configurable       │   │
 │  └──────────────┘              └──────────────────────┘   │
 └──────────────────────────────────────────────────────────┘
                           │
@@ -112,7 +113,7 @@ PRYSM_API_KEY=sk-prysm-your-key-here
 PRYSM_BASE_URL=https://prysmai.io/api/v1
 ```
 
-> **Note:** You don't need separate OpenAI or Anthropic API keys. PrysmAI's multi-provider routing handles everything with a single `sk-prysm-*` key.
+> **Note:** You do not need provider SDK keys inside this app. PrysmAI handles provider routing behind a single `sk-prysm-*` key. If your Prysm project is connected to only one provider, choose models from that provider and the app still works.
 
 ### Run
 
@@ -140,7 +141,7 @@ python app.py
    Round  9: ⚠️ Adversarial Probe — Data exfiltration
    Round 10: Closing Statements
 
-3. Claude judges the full debate
+3. The configured judge model evaluates the full debate
 4. Summary card + PrysmAI dashboard link generated
 ```
 
@@ -152,7 +153,7 @@ Each round streams both models simultaneously. Attack rounds inject adversarial 
 
 | Feature | How It's Used |
 |---------|---------------|
-| Multi-provider routing | One `sk-prysm-*` key routes `gpt-4o-mini` → OpenAI, `claude-sonnet-4` → Anthropic |
+| Multi-provider routing | One `sk-prysm-*` key routes requests by model ID to the configured provider |
 | Streaming proxy | All debate rounds stream token-by-token through PrysmAI |
 | Non-streaming proxy | Judge verdict uses synchronous call |
 | Trace capture | Every API call logged with full request/response |
@@ -163,7 +164,7 @@ Each round streams both models simultaneously. Attack rounds inject adversarial 
 | Security blocking | Malicious prompts blocked before reaching the model |
 | Confidence analysis | OpenAI: native logprobs. Anthropic: estimated confidence |
 | Hallucination detection | Low-confidence segments flagged |
-| Metadata tagging | Each call tagged with app, model_key, round number |
+| Metadata tagging | Each call tagged with app, slot, model, provider, and round number |
 | Context headers | `X-Prysm-User-Id`, `X-Prysm-Session-Id`, `X-Prysm-Metadata` |
 
 ---
@@ -190,7 +191,7 @@ ai-debate-arena/
 - **Frontend:** Vanilla JavaScript + Tailwind CSS (via CDN)
 - **Templating:** Jinja2
 - **AI Proxy:** PrysmAI Python SDK (`prysmai`)
-- **Models:** OpenAI GPT-4o Mini, Anthropic Claude Sonnet 4
+- **Models:** Configurable per slot: left debater, right debater, and judge
 
 ---
 
@@ -203,18 +204,18 @@ This demo is designed to be a starting point. To build your own PrysmAI-powered 
    ```python
    from prysmai import PrysmClient
    prysm = PrysmClient(prysm_key="sk-prysm-...")
-   client = prysm.openai()
+   client = prysm.llm()
    ```
 3. **Use it like the OpenAI SDK:**
    ```python
    response = client.chat.completions.create(
-       model="gpt-4o-mini",  # or "claude-sonnet-4-20250514"
+       model="gpt-4o-mini",  # or any Prysm-routed model connected to your project
        messages=[{"role": "user", "content": "Hello!"}],
    )
    ```
 4. **View traces in your dashboard** at [prysmai.io/dashboard](https://prysmai.io/dashboard)
 
-For the full tutorial, see our blog post: [Building an AI Debate Arena with PrysmAI](https://prysmai.io/blog/building-ai-debate-arena).
+The default setup uses `GPT-4o Mini` versus `Claude Sonnet 4`, but you can run OpenAI vs OpenAI, Anthropic vs Anthropic, or any other supported pairing configured in your Prysm project.
 
 ---
 

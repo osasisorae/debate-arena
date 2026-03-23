@@ -4,11 +4,17 @@ Runs all rounds via API, captures SSE events, and gets judge verdict.
 Verifies the backend completes without errors.
 """
 import json
+import os
 import time
 import requests
 import sseclient
 
-BASE_URL = "http://localhost:8080"
+BASE_URL = os.getenv("DEBATE_BASE_URL", "http://localhost:8080")
+DEFAULT_MODEL_CONFIG = {
+    "left": os.getenv("DEBATE_LEFT_MODEL", "gpt-4o-mini"),
+    "right": os.getenv("DEBATE_RIGHT_MODEL", "gpt-4.1-mini"),
+    "judge": os.getenv("DEBATE_JUDGE_MODEL", "gpt-4.1-mini"),
+}
 
 def test_full_debate():
     print("=" * 60)
@@ -18,14 +24,20 @@ def test_full_debate():
     # 1. Start debate
     print("\n[1] Starting debate...")
     res = requests.post(f"{BASE_URL}/api/debate/start", json={
-        "topic": "Is open-source AI safer than closed-source AI?"
+        "topic": "Is open-source AI safer than closed-source AI?",
+        "model_config": DEFAULT_MODEL_CONFIG,
     })
     assert res.status_code == 200, f"Start failed: {res.status_code} {res.text}"
     data = res.json()
     session_id = data["session_id"]
     total_rounds = data["total_rounds"]
     round_types = data["round_types"]
+    slot_models = data["slot_models"]
+    left_name = slot_models["gpt"]["name"]
+    right_name = slot_models["claude"]["name"]
+    judge_name = slot_models["judge"]["name"]
     print(f"    Session: {session_id}, Rounds: {total_rounds}")
+    print(f"    Left: {left_name} | Right: {right_name} | Judge: {judge_name}")
     
     # 2. Run all 10 rounds
     all_round_results = []
@@ -58,17 +70,17 @@ def test_full_debate():
             "round": round_num,
             "label": label,
             "is_attack": is_attack,
-            "gpt_tokens": 0,
-            "claude_tokens": 0,
-            "gpt_blocked": False,
-            "claude_blocked": False,
-            "gpt_latency": 0,
-            "claude_latency": 0,
+            "left_tokens": 0,
+            "right_tokens": 0,
+            "left_blocked": False,
+            "right_blocked": False,
+            "left_latency": 0,
+            "right_latency": 0,
             "events": [],
         }
-        
-        gpt_token_count = 0
-        claude_token_count = 0
+
+        left_token_count = 0
+        right_token_count = 0
         
         for event in client.events():
             evt_type = event.event
@@ -77,40 +89,42 @@ def test_full_debate():
             if evt_type == "token":
                 model = evt_data.get("model", "?")
                 if model == "gpt":
-                    gpt_token_count += 1
+                    left_token_count += 1
                 else:
-                    claude_token_count += 1
-            
+                    right_token_count += 1
+
             elif evt_type == "security_blocked":
                 model = evt_data.get("model", "?")
                 threat = evt_data.get("threat_level", "?")
                 score = evt_data.get("threat_score", 0)
-                print(f"    🛡️  {model.upper()} BLOCKED — threat={threat}, score={score}")
+                blocked_name = left_name if model == "gpt" else right_name
+                print(f"    🛡️  {blocked_name} BLOCKED — threat={threat}, score={score}")
                 if model == "gpt":
-                    round_data["gpt_blocked"] = True
+                    round_data["left_blocked"] = True
                 else:
-                    round_data["claude_blocked"] = True
-            
+                    round_data["right_blocked"] = True
+
             elif evt_type == "done":
                 model = evt_data.get("model", "?")
                 latency = evt_data.get("latency_ms", 0)
                 tokens = evt_data.get("tokens", 0)
                 blocked = evt_data.get("blocked", False)
+                model_name = evt_data.get("model_name", left_name if model == "gpt" else right_name)
                 if model == "gpt":
-                    round_data["gpt_latency"] = latency
-                    round_data["gpt_tokens"] = tokens
+                    round_data["left_latency"] = latency
+                    round_data["left_tokens"] = tokens
                 else:
-                    round_data["claude_latency"] = latency
-                    round_data["claude_tokens"] = tokens
+                    round_data["right_latency"] = latency
+                    round_data["right_tokens"] = tokens
                 status = "BLOCKED" if blocked else f"{tokens} tokens"
-                print(f"    ✓ {model.upper()}: {latency/1000:.1f}s, {status}")
+                print(f"    ✓ {model_name}: {latency/1000:.1f}s, {status}")
             
             elif evt_type == "round_end":
                 break
         
         elapsed = time.time() - start
-        total_tokens_all += round_data["gpt_tokens"] + round_data["claude_tokens"]
-        print(f"    Stream tokens: GPT={gpt_token_count}, Claude={claude_token_count}")
+        total_tokens_all += round_data["left_tokens"] + round_data["right_tokens"]
+        print(f"    Stream tokens: {left_name}={left_token_count}, {right_name}={right_token_count}")
         print(f"    Round time: {elapsed:.1f}s")
         
         all_round_results.append(round_data)
@@ -135,14 +149,14 @@ def test_full_debate():
     attack_rounds = [r for r in all_round_results if r["is_attack"]]
     normal_rounds = [r for r in all_round_results if not r["is_attack"]]
     
-    gpt_blocked = sum(1 for r in attack_rounds if r["gpt_blocked"])
-    claude_blocked = sum(1 for r in attack_rounds if r["claude_blocked"])
+    left_blocked = sum(1 for r in attack_rounds if r["left_blocked"])
+    right_blocked = sum(1 for r in attack_rounds if r["right_blocked"])
     
     print(f"  Total rounds: {len(all_round_results)}")
     print(f"  Attack rounds: {len(attack_rounds)}")
     print(f"  Normal rounds: {len(normal_rounds)}")
-    print(f"  GPT blocked in attack rounds: {gpt_blocked}/{len(attack_rounds)}")
-    print(f"  Claude blocked in attack rounds: {claude_blocked}/{len(attack_rounds)}")
+    print(f"  {left_name} blocked in attack rounds: {left_blocked}/{len(attack_rounds)}")
+    print(f"  {right_name} blocked in attack rounds: {right_blocked}/{len(attack_rounds)}")
     print(f"  Total tokens: {total_tokens_all}")
     print(f"\n  ✅ ALL 10 ROUNDS + JUDGE VERDICT COMPLETED SUCCESSFULLY")
     

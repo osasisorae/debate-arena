@@ -1,5 +1,5 @@
 """
-AI Debate Arena — FastAPI Application v2
+AI Debate Arena — FastAPI Application v3
 10 rounds with prompt injection attacks and security triggers.
 All LLM calls routed through PrysmAI for full observability.
 """
@@ -13,14 +13,16 @@ from fastapi.templating import Jinja2Templates
 from sse_starlette.sse import EventSourceResponse
 
 from debate_engine import (
-    MODELS,
+    MODEL_CATALOG,
+    DEFAULT_DEBATE_CONFIG,
+    build_slot_models,
     ROUND_TYPES,
     TOTAL_ROUNDS,
     run_debate_round_streaming,
     judge_debate,
 )
 
-app = FastAPI(title="AI Debate Arena", version="2.0.0")
+app = FastAPI(title="AI Debate Arena", version="3.0.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -39,15 +41,39 @@ PRESET_TOPICS = [
 ]
 
 
+def normalize_model_config(payload: dict | None) -> dict[str, str]:
+    config = {**DEFAULT_DEBATE_CONFIG}
+    if not payload:
+        return config
+
+    left = payload.get("left")
+    right = payload.get("right")
+    judge = payload.get("judge")
+
+    if isinstance(left, str) and left.strip():
+        config["left"] = left.strip()
+    if isinstance(right, str) and right.strip():
+        config["right"] = right.strip()
+    if isinstance(judge, str) and judge.strip():
+        config["judge"] = judge.strip()
+
+    return config
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "preset_topics": PRESET_TOPICS,
-        "models": MODELS,
-        "round_types": ROUND_TYPES,
-        "total_rounds": TOTAL_ROUNDS,
-    })
+    return templates.TemplateResponse(
+        request,
+        "index.html",
+        {
+            "request": request,
+            "preset_topics": PRESET_TOPICS,
+            "model_catalog": list(MODEL_CATALOG.values()),
+            "default_model_config": DEFAULT_DEBATE_CONFIG,
+            "round_types": ROUND_TYPES,
+            "total_rounds": TOTAL_ROUNDS,
+        },
+    )
 
 
 @app.post("/api/debate/start")
@@ -55,6 +81,8 @@ async def start_debate(request: Request):
     """Start a new debate session."""
     body = await request.json()
     topic = body.get("topic", "").strip()
+    model_config = normalize_model_config(body.get("model_config"))
+    slot_models = build_slot_models(model_config)
     
     if not topic:
         return JSONResponse({"error": "Topic is required"}, status_code=400)
@@ -68,6 +96,7 @@ async def start_debate(request: Request):
         "current_round": 0,
         "total_rounds": TOTAL_ROUNDS,
         "status": "active",
+        "slot_models": slot_models,
     }
     
     return {
@@ -75,6 +104,8 @@ async def start_debate(request: Request):
         "topic": topic,
         "total_rounds": TOTAL_ROUNDS,
         "round_types": {str(k): v for k, v in ROUND_TYPES.items()},
+        "model_config": model_config,
+        "slot_models": slot_models,
     }
 
 
@@ -89,18 +120,26 @@ async def stream_round(session_id: str, round_num: int):
         return JSONResponse({"error": "Invalid round number"}, status_code=400)
     
     def event_generator():
+        completed_round = {
+            "gpt": "",
+            "claude": "",
+        }
         for chunk in run_debate_round_streaming(
             topic=debate["topic"],
             round_num=round_num,
             session_id=session_id,
+            slot_models=debate["slot_models"],
             gpt_history=debate["gpt_history"],
             claude_history=debate["claude_history"],
         ):
             event_type = chunk.get("type", "data")
             
+            if event_type == "done":
+                completed_round[chunk["model"]] = chunk["content"]
+            
             if event_type == "round_end":
-                debate["gpt_history"].append(chunk["gpt_content"])
-                debate["claude_history"].append(chunk["claude_content"])
+                debate["gpt_history"].append(completed_round["gpt"] or chunk["gpt_content"])
+                debate["claude_history"].append(completed_round["claude"] or chunk["claude_content"])
                 debate["current_round"] = round_num
             
             yield {
@@ -123,6 +162,7 @@ async def get_verdict(session_id: str):
         gpt_history=debate["gpt_history"],
         claude_history=debate["claude_history"],
         session_id=session_id,
+        slot_models=debate["slot_models"],
     )
     
     debate["status"] = "complete"
@@ -142,6 +182,7 @@ async def debate_status(session_id: str):
         "total_rounds": debate["total_rounds"],
         "status": debate["status"],
         "rounds_completed": len(debate["gpt_history"]),
+        "slot_models": debate["slot_models"],
     }
 
 

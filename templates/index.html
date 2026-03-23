@@ -56,7 +56,7 @@
                     </svg>
                 </div>
                 <span class="text-lg font-bold tracking-tight">AI Debate <span class="text-arena-accent">Arena</span></span>
-                <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">v2</span>
+                <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">v3</span>
             </div>
             <div class="flex items-center gap-2 text-xs text-gray-500 font-mono">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -73,15 +73,14 @@
             <div class="text-center max-w-2xl mx-auto pt-12 pb-8">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono border border-arena-accent/30 bg-arena-accent/10 text-arena-accent mb-6">
                     <span class="w-1.5 h-1.5 rounded-full bg-arena-accent"></span>
-                    GPT-4o Mini vs Claude Sonnet 4 — 10 Rounds + Security Probes
+                    Any two Prysm-routed models — 10 Rounds + Security Probes
                 </div>
                 <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
-                    Two AIs enter.<br>
+                    Two models enter.<br>
                     <span class="bg-gradient-to-r from-gpt to-claude bg-clip-text text-transparent">One argument wins.</span>
                 </h1>
                 <p class="text-gray-400 text-lg mb-8 max-w-lg mx-auto">
-                    10 rounds of debate including adversarial prompt injection attacks. 
-                    Watch how each model handles jailbreaks, role hijacking, and data exfiltration attempts — all monitored by PrysmAI.
+                    Configure the left model, right model, and judge. Then run 10 rounds of debate with adversarial prompt injection attacks while PrysmAI traces, blocks, and explains what happened.
                 </p>
 
                 <!-- Topic Input -->
@@ -101,6 +100,33 @@
                             Start Debate →
                         </button>
                     </div>
+                </div>
+
+                <div class="max-w-3xl mx-auto mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="text-left">
+                        <div class="text-[10px] font-mono text-gray-500 mb-1.5 uppercase tracking-wider">Left Debater</div>
+                        <select id="left-model-select" class="w-full h-11 px-3 rounded-lg bg-arena-card border border-arena-border text-white text-sm focus:outline-none focus:border-arena-accent/50 focus:ring-1 focus:ring-arena-accent/20">
+                            {% for model in model_catalog %}
+                            <option value="{{ model.id }}" {% if model.id == default_model_config.left %}selected{% endif %}>{{ model.name }} · {{ model.provider }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="text-left">
+                        <div class="text-[10px] font-mono text-gray-500 mb-1.5 uppercase tracking-wider">Right Debater</div>
+                        <select id="right-model-select" class="w-full h-11 px-3 rounded-lg bg-arena-card border border-arena-border text-white text-sm focus:outline-none focus:border-arena-accent/50 focus:ring-1 focus:ring-arena-accent/20">
+                            {% for model in model_catalog %}
+                            <option value="{{ model.id }}" {% if model.id == default_model_config.right %}selected{% endif %}>{{ model.name }} · {{ model.provider }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="text-left">
+                        <div class="text-[10px] font-mono text-gray-500 mb-1.5 uppercase tracking-wider">Judge</div>
+                        <select id="judge-model-select" class="w-full h-11 px-3 rounded-lg bg-arena-card border border-arena-border text-white text-sm focus:outline-none focus:border-arena-accent/50 focus:ring-1 focus:ring-arena-accent/20">
+                            {% for model in model_catalog %}
+                            <option value="{{ model.id }}" {% if model.id == default_model_config.judge %}selected{% endif %}>{{ model.name }} · {{ model.provider }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
                 </div>
 
                 <!-- Auto-Run Toggle -->
@@ -160,7 +186,7 @@
                 <div class="p-4 rounded-xl border border-arena-border bg-arena-card/50 text-center">
                     <div class="text-2xl mb-2">📊</div>
                     <h3 class="font-semibold text-xs mb-1">Full Observability</h3>
-                    <p class="text-[10px] text-gray-500">21 API calls tracked in PrysmAI</p>
+                    <p class="text-[10px] text-gray-500">Every round traced through PrysmAI</p>
                 </div>
                 <div class="p-4 rounded-xl border border-arena-border bg-arena-card/50 text-center">
                     <div class="text-2xl mb-2">🔍</div>
@@ -250,8 +276,8 @@
                     <div class="px-4 py-3 border-b border-gpt/10 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-gpt"></div>
-                            <span class="font-semibold text-sm text-gpt-light">GPT-4o Mini</span>
-                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">OpenAI · FOR</span>
+                            <span id="gpt-model-name" class="font-semibold text-sm text-gpt-light">Left Model</span>
+                            <span id="gpt-model-provider" class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">FOR</span>
                         </div>
                         <div id="gpt-status" class="text-[10px] font-mono text-gray-600">WAITING</div>
                     </div>
@@ -272,8 +298,8 @@
                     <div class="px-4 py-3 border-b border-claude/10 flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <div class="w-3 h-3 rounded-full bg-claude"></div>
-                            <span class="font-semibold text-sm text-claude-light">Claude Sonnet 4</span>
-                            <span class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">Anthropic · AGAINST</span>
+                            <span id="claude-model-name" class="font-semibold text-sm text-claude-light">Right Model</span>
+                            <span id="claude-model-provider" class="text-[10px] font-mono text-gray-600 border border-gray-700 px-1.5 py-0.5 rounded">AGAINST</span>
                         </div>
                         <div id="claude-status" class="text-[10px] font-mono text-gray-600">WAITING</div>
                     </div>
@@ -347,14 +373,14 @@
                             <div class="p-3 rounded-lg bg-arena-bg/50 border border-arena-border">
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-2.5 h-2.5 rounded-full bg-gpt"></div>
-                                    <span class="text-xs font-semibold text-gpt-light">GPT-4o Mini</span>
+                                    <span id="summary-gpt-name" class="text-xs font-semibold text-gpt-light">Left Model</span>
                                 </div>
                                 <div class="text-[10px] font-mono text-gray-500"><span id="summary-gpt-tokens" class="text-gpt-light">0</span> tokens · <span id="summary-gpt-latency" class="text-gpt-light">0s</span></div>
                             </div>
                             <div class="p-3 rounded-lg bg-arena-bg/50 border border-arena-border">
                                 <div class="flex items-center gap-2 mb-2">
                                     <div class="w-2.5 h-2.5 rounded-full bg-claude"></div>
-                                    <span class="text-xs font-semibold text-claude-light">Claude Sonnet 4</span>
+                                    <span id="summary-claude-name" class="text-xs font-semibold text-claude-light">Right Model</span>
                                 </div>
                                 <div class="text-[10px] font-mono text-gray-500"><span id="summary-claude-tokens" class="text-claude-light">0</span> tokens · <span id="summary-claude-latency" class="text-claude-light">0s</span></div>
                             </div>
@@ -422,7 +448,7 @@
                         <div class="p-4 rounded-lg border border-gpt/20 bg-arena-card">
                             <div class="flex items-center gap-2 mb-3">
                                 <div class="w-2.5 h-2.5 rounded-full bg-gpt"></div>
-                                <span class="text-sm font-semibold text-gpt-light">GPT-4o Mini</span>
+                                <span id="insight-gpt-name" class="text-sm font-semibold text-gpt-light">Left Model</span>
                             </div>
                             <div class="grid grid-cols-3 gap-3 text-center">
                                 <div>
@@ -444,7 +470,7 @@
                         <div class="p-4 rounded-lg border border-claude/20 bg-arena-card">
                             <div class="flex items-center gap-2 mb-3">
                                 <div class="w-2.5 h-2.5 rounded-full bg-claude"></div>
-                                <span class="text-sm font-semibold text-claude-light">Claude Sonnet 4</span>
+                                <span id="insight-claude-name" class="text-sm font-semibold text-claude-light">Right Model</span>
                             </div>
                             <div class="grid grid-cols-3 gap-3 text-center">
                                 <div>
@@ -484,6 +510,10 @@
     </footer>
 
     <script>
+        const MODEL_CATALOG = {{ model_catalog | tojson }};
+        const MODEL_INDEX = Object.fromEntries(MODEL_CATALOG.map(model => [model.id, model]));
+        const DEFAULT_MODEL_CONFIG = {{ default_model_config | tojson }};
+
         // ═══════ STATE ═══════
         let sessionId = null;
         let currentRound = 0;
@@ -497,15 +527,44 @@
             claude: { totalLatency: 0, totalTtft: 0, totalTokens: 0, rounds: 0 },
         };
         let roundHistory = []; // stores {round, label, type, isAttack, gpt, claude}
+        let activeModelConfig = { ...DEFAULT_MODEL_CONFIG };
+        let activeSlotModels = {
+            gpt: MODEL_INDEX[DEFAULT_MODEL_CONFIG.left],
+            claude: MODEL_INDEX[DEFAULT_MODEL_CONFIG.right],
+            judge: MODEL_INDEX[DEFAULT_MODEL_CONFIG.judge],
+        };
 
-        // Cost per 1M tokens (approximate)
-        const COST_PER_1M = { gpt: 0.15, claude: 3.00 };
+        function getSlotModel(slot) {
+            return activeSlotModels[slot] || { id: slot, name: slot, provider: 'Custom', cost_per_1m_tokens: 0 };
+        }
+
+        function getSelectedModelConfig() {
+            return {
+                left: document.getElementById('left-model-select').value,
+                right: document.getElementById('right-model-select').value,
+                judge: document.getElementById('judge-model-select').value,
+            };
+        }
+
+        function applySelectedModels(slotModels = activeSlotModels) {
+            activeSlotModels = slotModels;
+
+            document.getElementById('gpt-model-name').textContent = slotModels.gpt.name;
+            document.getElementById('gpt-model-provider').textContent = `${slotModels.gpt.provider} · FOR`;
+            document.getElementById('claude-model-name').textContent = slotModels.claude.name;
+            document.getElementById('claude-model-provider').textContent = `${slotModels.claude.provider} · AGAINST`;
+
+            document.getElementById('summary-gpt-name').textContent = slotModels.gpt.name;
+            document.getElementById('summary-claude-name').textContent = slotModels.claude.name;
+            document.getElementById('insight-gpt-name').textContent = slotModels.gpt.name;
+            document.getElementById('insight-claude-name').textContent = slotModels.claude.name;
+        }
 
         // ═══════ LIVE STATS ═══════
         function updateLiveStats() {
             const totalTokens = metrics.gpt.totalTokens + metrics.claude.totalTokens;
-            const gptCost = (metrics.gpt.totalTokens / 1_000_000) * COST_PER_1M.gpt;
-            const claudeCost = (metrics.claude.totalTokens / 1_000_000) * COST_PER_1M.claude;
+            const gptCost = (metrics.gpt.totalTokens / 1_000_000) * (getSlotModel('gpt').cost_per_1m_tokens || 0);
+            const claudeCost = (metrics.claude.totalTokens / 1_000_000) * (getSlotModel('claude').cost_per_1m_tokens || 0);
             const totalCost = gptCost + claudeCost;
             const totalTtftRounds = metrics.gpt.rounds + metrics.claude.rounds;
             const avgTtft = totalTtftRounds > 0 
@@ -528,10 +587,13 @@
             autoRunEnabled = e.target.checked;
         });
 
+        applySelectedModels(activeSlotModels);
+
         // ═══════ START DEBATE ═══════
         async function startDebate() {
             const topic = document.getElementById('topic-input').value.trim();
             if (!topic) return alert('Please enter a debate topic.');
+            activeModelConfig = getSelectedModelConfig();
 
             const btn = document.getElementById('start-btn');
             btn.textContent = 'Starting...';
@@ -541,12 +603,15 @@
                 const res = await fetch('/api/debate/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic }),
+                    body: JSON.stringify({ topic, model_config: activeModelConfig }),
                 });
                 const data = await res.json();
                 sessionId = data.session_id;
                 totalRounds = data.total_rounds;
                 roundTypes = data.round_types || {};
+                activeModelConfig = data.model_config || activeModelConfig;
+                activeSlotModels = data.slot_models || activeSlotModels;
+                applySelectedModels(activeSlotModels);
 
                 // Switch screens
                 document.getElementById('start-screen').classList.add('hidden');
@@ -840,6 +905,8 @@
             
             const borderColor = r.isAttack ? 'border-red-500/20' : 'border-arena-border';
             const badge = r.isAttack ? `<span class="text-[9px] font-mono text-red-400 border border-red-500/30 px-1 py-0.5 rounded">⚠ ${r.attackType.replace(/_/g, ' ')}</span>` : '';
+            const leftModel = getSlotModel('gpt');
+            const rightModel = getSlotModel('claude');
             const div = document.createElement('div');
             div.className = `p-3 rounded-lg border ${borderColor} bg-arena-card/30`;
             div.innerHTML = `
@@ -849,8 +916,8 @@
                     ${badge}
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-[11px] text-gray-500">
-                    <div><span class="text-gpt-light font-medium">GPT:</span> ${r.gptBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.gpt || '').substring(0, 100)) + '...'}</div>
-                    <div><span class="text-claude-light font-medium">Claude:</span> ${r.claudeBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.claude || '').substring(0, 100)) + '...'}</div>
+                    <div><span class="text-gpt-light font-medium">${escapeHtml(leftModel.name)}:</span> ${r.gptBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.gpt || '').substring(0, 100)) + '...'}</div>
+                    <div><span class="text-claude-light font-medium">${escapeHtml(rightModel.name)}:</span> ${r.claudeBlocked ? '<span class="text-red-400">🛡️ BLOCKED</span>' : escapeHtml((r.claude || '').substring(0, 100)) + '...'}</div>
                 </div>
             `;
             content.appendChild(div);
@@ -956,12 +1023,16 @@
             const gpt = metrics.gpt;
             const claude = metrics.claude;
             const totalTokens = gpt.totalTokens + claude.totalTokens;
-            const gptCost = (gpt.totalTokens / 1_000_000) * COST_PER_1M.gpt;
-            const claudeCost = (claude.totalTokens / 1_000_000) * COST_PER_1M.claude;
+            const leftModel = getSlotModel('gpt');
+            const rightModel = getSlotModel('claude');
+            const gptCost = (gpt.totalTokens / 1_000_000) * (leftModel.cost_per_1m_tokens || 0);
+            const claudeCost = (claude.totalTokens / 1_000_000) * (rightModel.cost_per_1m_tokens || 0);
             const totalCost = gptCost + claudeCost;
 
             document.getElementById('summary-session-id').textContent = sessionId ? sessionId.substring(0, 8) : '—';
             document.getElementById('summary-topic').textContent = document.getElementById('topic-input').value || 'AI Debate';
+            document.getElementById('summary-gpt-name').textContent = leftModel.name;
+            document.getElementById('summary-claude-name').textContent = rightModel.name;
             document.getElementById('summary-gpt-tokens').textContent = gpt.totalTokens.toLocaleString();
             document.getElementById('summary-gpt-latency').textContent = `${(gpt.totalLatency / 1000).toFixed(1)}s`;
             document.getElementById('summary-claude-tokens').textContent = claude.totalTokens.toLocaleString();
@@ -972,25 +1043,31 @@
 
             // Extract winner from verdict
             const verdict = document.getElementById('verdict-content').textContent.toLowerCase();
-            // Look for explicit winner declarations like "winner: claude" or "winner: gpt"
             const winnerMatch = verdict.match(/winner[:\s]+([\w\s.-]+?)(?:\s*\(|\s*wins|\s*—|\n|$)/i);
             let winner = 'draw';
+
+            const leftNeedles = [leftModel.name, leftModel.id].map(value => value.toLowerCase());
+            const rightNeedles = [rightModel.name, rightModel.id].map(value => value.toLowerCase());
+
+            function mentionsAny(text, needles) {
+                return needles.some(needle => text.includes(needle));
+            }
+
             if (winnerMatch) {
                 const winnerText = winnerMatch[1].trim().toLowerCase();
-                if (winnerText.includes('claude')) winner = 'claude';
-                else if (winnerText.includes('gpt')) winner = 'gpt';
+                if (mentionsAny(winnerText, rightNeedles)) winner = 'claude';
+                else if (mentionsAny(winnerText, leftNeedles)) winner = 'gpt';
             } else {
-                // Fallback: check for "X wins" pattern
-                if (verdict.includes('claude') && verdict.includes('wins') && verdict.indexOf('claude') < verdict.indexOf('wins') && (verdict.indexOf('claude') + 30) > verdict.indexOf('wins')) {
+                if (mentionsAny(verdict, rightNeedles) && verdict.includes('wins')) {
                     winner = 'claude';
-                } else if (verdict.includes('gpt') && verdict.includes('wins') && verdict.indexOf('gpt') < verdict.indexOf('wins') && (verdict.indexOf('gpt') + 30) > verdict.indexOf('wins')) {
+                } else if (mentionsAny(verdict, leftNeedles) && verdict.includes('wins')) {
                     winner = 'gpt';
                 }
             }
             if (winner === 'claude') {
-                document.getElementById('summary-winner').textContent = '🏆 Claude Sonnet 4 Wins';
+                document.getElementById('summary-winner').textContent = `🏆 ${rightModel.name} Wins`;
             } else if (winner === 'gpt') {
-                document.getElementById('summary-winner').textContent = '🏆 GPT-4o Mini Wins';
+                document.getElementById('summary-winner').textContent = `🏆 ${leftModel.name} Wins`;
             } else {
                 document.getElementById('summary-winner').textContent = '🤝 Draw';
             }

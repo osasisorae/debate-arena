@@ -1,10 +1,10 @@
-# Build an AI Debate Arena: GPT-4o vs Claude, Side by Side, with Full Observability
+# Build an AI Debate Arena: Any Two Models, Side by Side, with Full Observability
 
 *By Osarenren I · February 24, 2026 · 22 min read*
 
 ---
 
-In this tutorial, we'll build an AI Debate Arena from scratch — an application where GPT-4o Mini and Claude Sonnet 4 debate any topic you throw at them, streaming their arguments side by side in real time. We'll also inject real prompt injection attacks into the debate to test how well our security layer holds up.
+In this tutorial, we'll build an AI Debate Arena from scratch: an application where any two Prysm-routed models debate any topic you throw at them, streaming their arguments side by side in real time. We'll also inject real prompt injection attacks into the debate to test how well our security layer holds up.
 
 Every single LLM call in this app goes through PrysmAI. No direct OpenAI or Anthropic SDK imports. One API key. One proxy. Full observability on every token.
 
@@ -19,10 +19,10 @@ The full source code is on GitHub: [github.com/osasisorae/debate-arena](https://
 Here's the flow:
 
 1. User picks a debate topic (or types their own)
-2. GPT-4o Mini argues **FOR**, Claude Sonnet 4 argues **AGAINST**
+2. A configurable left model argues **FOR**, and a configurable right model argues **AGAINST**
 3. They go back and forth for **10 rounds** — opening arguments, rebuttals, evidence rounds, and closing statements
 4. Rounds 3, 5, 7, and 9 are **adversarial probe rounds** — we inject real prompt injection attacks (jailbreaks, system prompt extraction, role hijacking, data exfiltration) to test PrysmAI's security scanning
-5. After all 10 rounds, Claude judges who won the debate
+5. After all 10 rounds, the configured judge model decides who won the debate
 6. The entire time, PrysmAI is recording traces, analyzing confidence, tracking costs, and blocking malicious prompts
 
 **Tech stack:**
@@ -44,11 +44,11 @@ No React. No build tools. No npm. Just Python and HTML. The point is to show Pry
 Before we start building, you need:
 
 1. **A PrysmAI account** — sign up at [prysmai.io](https://prysmai.io)
-2. **A PrysmAI project** with both OpenAI and Anthropic API keys connected (Settings → Configuration → Add Provider Key)
+2. **A PrysmAI project** with at least one provider connected (OpenAI, Anthropic, Gemini, or another Prysm-routed provider)
 3. **Your PrysmAI API key** — found in your project's API Keys section (starts with `sk-prysm-`)
 4. **Python 3.10+** installed locally
 
-The key thing here is that you connect **both** your OpenAI and Anthropic keys to the **same** PrysmAI project. PrysmAI's multi-provider routing detects the provider from the model name automatically — when you send `model: "gpt-4o-mini"`, it routes to OpenAI; when you send `model: "claude-sonnet-4-20250514"`, it routes to Anthropic. One key handles everything.
+The key thing here is that you connect your provider keys to the same PrysmAI project. PrysmAI's routing detects the provider from the model name automatically, so one `sk-prysm-*` key can power the whole app.
 
 ---
 
@@ -98,10 +98,10 @@ prysm = PrysmClient(
     timeout=120.0,
 )
 
-client = prysm.openai()
+client = prysm.llm()
 ```
 
-The `PrysmClient` wraps the OpenAI SDK. When you call `prysm.openai()`, you get back a standard OpenAI client that points at PrysmAI's proxy instead of OpenAI's API directly. This means all your existing OpenAI code works unchanged — you just swap the client.
+The `PrysmClient` exposes an OpenAI-compatible client. When you call `prysm.llm()`, you get back a standard client that points at PrysmAI's proxy instead of a provider API directly.
 
 ### Defining the Models
 

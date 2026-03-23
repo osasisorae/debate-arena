@@ -1,14 +1,14 @@
 """
-AI Debate Arena — Debate Engine v2
+AI Debate Arena — Debate Engine v3
 10 rounds, prompt injection attacks, security scanning triggers.
 Routes all LLM calls through PrysmAI proxy using the Python SDK.
-One API key, two models, full observability.
+Configurable model slots, one API key, full observability.
 """
 
 import os
 import time
 import random
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 
 from dotenv import load_dotenv
 from prysmai import PrysmClient
@@ -24,25 +24,93 @@ prysm = PrysmClient(
     timeout=120.0,
 )
 
-client = prysm.openai()
+client = prysm.llm()
 
 
-# ─── Models ───
+# ─── Model Catalog ───
 
-MODELS = {
-    "gpt": {
+MODEL_CATALOG = {
+    "gpt-4o-mini": {
         "id": "gpt-4o-mini",
         "name": "GPT-4o Mini",
         "provider": "OpenAI",
         "color": "#3B82F6",
+        "cost_per_1m_tokens": 0.15,
     },
-    "claude": {
+    "gpt-4.1-mini": {
+        "id": "gpt-4.1-mini",
+        "name": "GPT-4.1 Mini",
+        "provider": "OpenAI",
+        "color": "#2563EB",
+        "cost_per_1m_tokens": 0.40,
+    },
+    "gpt-4.1-nano": {
+        "id": "gpt-4.1-nano",
+        "name": "GPT-4.1 Nano",
+        "provider": "OpenAI",
+        "color": "#1D4ED8",
+        "cost_per_1m_tokens": 0.10,
+    },
+    "claude-sonnet-4-20250514": {
         "id": "claude-sonnet-4-20250514",
         "name": "Claude Sonnet 4",
         "provider": "Anthropic",
         "color": "#06B6D4",
+        "cost_per_1m_tokens": 3.00,
+    },
+    "claude-3-5-sonnet-20241022": {
+        "id": "claude-3-5-sonnet-20241022",
+        "name": "Claude 3.5 Sonnet",
+        "provider": "Anthropic",
+        "color": "#0891B2",
+        "cost_per_1m_tokens": 3.00,
+    },
+    "gemini-2.5-flash": {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "provider": "Google",
+        "color": "#8B5CF6",
+        "cost_per_1m_tokens": 0.30,
     },
 }
+
+DEFAULT_DEBATE_CONFIG = {
+    "left": "gpt-4o-mini",
+    "right": "claude-sonnet-4-20250514",
+    "judge": "claude-sonnet-4-20250514",
+}
+
+
+def _infer_provider(model_id: str) -> str:
+    lowered = model_id.lower()
+    if lowered.startswith(("gpt-", "o", "chatgpt-")):
+        return "OpenAI"
+    if lowered.startswith("claude-"):
+        return "Anthropic"
+    if lowered.startswith(("gemini-", "gemma-")):
+        return "Google"
+    return "Custom"
+
+
+def resolve_model_info(model_id: str) -> dict[str, Any]:
+    if model_id in MODEL_CATALOG:
+        return dict(MODEL_CATALOG[model_id])
+    return {
+        "id": model_id,
+        "name": model_id,
+        "provider": _infer_provider(model_id),
+        "color": "#8B5CF6",
+        "cost_per_1m_tokens": 0.0,
+    }
+
+
+def build_slot_models(model_config: Optional[dict[str, str]] = None) -> dict[str, dict[str, Any]]:
+    config = {**DEFAULT_DEBATE_CONFIG, **(model_config or {})}
+    return {
+        "gpt": resolve_model_info(config["left"]),
+        "claude": resolve_model_info(config["right"]),
+        "judge": resolve_model_info(config["judge"]),
+    }
 
 
 # ─── Round Types ───
@@ -196,12 +264,22 @@ Declare a winner and explain your reasoning in 200 words or less. Be specific ab
 
 # ─── Helper ───
 
-def _set_context(model_key: str, round_num: int, session_id: str, extra: Optional[dict] = None):
+def _set_context(
+    slot: str,
+    model_info: dict[str, Any],
+    round_num: int,
+    session_id: str,
+    extra: Optional[dict] = None,
+):
     """Set PrysmAI context globally before making a call."""
     round_info = ROUND_TYPES.get(round_num, {})
     meta = {
         "app": "ai-debate-arena",
-        "model_key": model_key,
+        "debate_slot": slot,
+        "model_key": slot,
+        "model_id": model_info["id"],
+        "model_name": model_info["name"],
+        "provider": model_info["provider"],
         "round": round_num,
         "round_type": round_info.get("type", "unknown"),
         "round_label": round_info.get("label", f"Round {round_num}"),
@@ -221,13 +299,13 @@ def _set_context(model_key: str, round_num: int, session_id: str, extra: Optiona
 # ─── Core Functions ───
 
 def call_model_streaming(
-    model_key: str,
+    slot: str,
+    model_info: dict[str, Any],
     messages: list[dict],
     round_num: int,
     session_id: str,
 ) -> Generator[dict, None, None]:
-    model_info = MODELS[model_key]
-    _set_context(model_key, round_num, session_id)
+    _set_context(slot, model_info, round_num, session_id)
 
     start_time = time.time()
     first_token_time = None
@@ -252,7 +330,9 @@ def call_model_streaming(
 
                 yield {
                     "type": "token",
-                    "model": model_key,
+                    "model": slot,
+                    "model_id": model_info["id"],
+                    "model_name": model_info["name"],
                     "content": token,
                     "ttft_ms": (first_token_time - start_time) * 1000 if first_token_time else 0,
                 }
@@ -266,7 +346,9 @@ def call_model_streaming(
 
         yield {
             "type": "done",
-            "model": model_key,
+            "model": slot,
+            "model_id": model_info["id"],
+            "model_name": model_info["name"],
             "content": full_content,
             "latency_ms": round(latency_ms, 1),
             "ttft_ms": round(ttft_ms, 1),
@@ -300,7 +382,9 @@ def call_model_streaming(
 
             yield {
                 "type": "security_blocked",
-                "model": model_key,
+                "model": slot,
+                "model_id": model_info["id"],
+                "model_name": model_info["name"],
                 "content": blocked_msg,
                 "threat_level": threat_level,
                 "threat_score": threat_score,
@@ -310,7 +394,9 @@ def call_model_streaming(
             # Also emit a done event with the blocked message so the round can continue
             yield {
                 "type": "done",
-                "model": model_key,
+                "model": slot,
+                "model_id": model_info["id"],
+                "model_name": model_info["name"],
                 "content": blocked_msg,
                 "latency_ms": round(latency_ms, 1),
                 "ttft_ms": 0,
@@ -321,21 +407,23 @@ def call_model_streaming(
         else:
             yield {
                 "type": "error",
-                "model": model_key,
+                "model": slot,
+                "model_id": model_info["id"],
+                "model_name": model_info["name"],
                 "error": error_str,
                 "round": round_num,
             }
 
 
 def call_model_sync(
-    model_key: str,
+    slot: str,
+    model_info: dict[str, Any],
     messages: list[dict],
     session_id: str,
     round_num: int = 0,
     metadata: Optional[dict] = None,
 ) -> dict:
-    model_info = MODELS[model_key]
-    _set_context(model_key, round_num, session_id, extra=metadata)
+    _set_context(slot, model_info, round_num, session_id, extra=metadata)
 
     start_time = time.time()
 
@@ -355,7 +443,9 @@ def call_model_sync(
             "content": content,
             "latency_ms": round((end_time - start_time) * 1000, 1),
             "tokens": tokens,
-            "model": model_key,
+            "model": slot,
+            "model_id": model_info["id"],
+            "model_name": model_info["name"],
         }
 
     except Exception as e:
@@ -363,7 +453,9 @@ def call_model_sync(
             "content": f"Error: {str(e)}",
             "latency_ms": 0,
             "tokens": 0,
-            "model": model_key,
+            "model": slot,
+            "model_id": model_info["id"],
+            "model_name": model_info["name"],
             "error": str(e),
         }
 
@@ -375,13 +467,17 @@ def build_messages(system: str, user: str) -> list[dict]:
     ]
 
 
-def _build_debate_history(gpt_history: list[str], claude_history: list[str]) -> str:
+def _build_debate_history(
+    gpt_history: list[str],
+    claude_history: list[str],
+    slot_models: dict[str, dict[str, Any]],
+) -> str:
     history_lines = []
     for i, (g, c) in enumerate(zip(gpt_history, claude_history), 1):
         round_info = ROUND_TYPES.get(i, {})
         label = round_info.get("label", f"Round {i}")
-        history_lines.append(f"{label} - GPT-4o Mini (FOR):\n{g}")
-        history_lines.append(f"{label} - Claude Sonnet 4 (AGAINST):\n{c}")
+        history_lines.append(f"{label} - {slot_models['gpt']['name']} (FOR):\n{g}")
+        history_lines.append(f"{label} - {slot_models['claude']['name']} (AGAINST):\n{c}")
     return "\n\n".join(history_lines)
 
 
@@ -389,6 +485,7 @@ def run_debate_round_streaming(
     topic: str,
     round_num: int,
     session_id: str,
+    slot_models: dict[str, dict[str, Any]],
     gpt_history: list[str],
     claude_history: list[str],
 ) -> Generator[dict, None, None]:
@@ -408,12 +505,12 @@ def run_debate_round_streaming(
         claude_prompt = get_opening_prompt(topic, "AGAINST")
 
     elif round_type == "closing":
-        debate_history = _build_debate_history(gpt_history, claude_history)
+        debate_history = _build_debate_history(gpt_history, claude_history, slot_models)
         gpt_prompt = get_closing_prompt(topic, "FOR", debate_history)
         claude_prompt = get_closing_prompt(topic, "AGAINST", debate_history)
 
     elif round_type == "deepdive":
-        debate_history = _build_debate_history(gpt_history, claude_history)
+        debate_history = _build_debate_history(gpt_history, claude_history, slot_models)
         gpt_prompt = get_deepdive_prompt(topic, "FOR", debate_history)
         claude_prompt = get_deepdive_prompt(topic, "AGAINST", debate_history)
 
@@ -444,17 +541,35 @@ def run_debate_round_streaming(
     }
 
     # GPT streams
-    yield {"type": "model_start", "model": "gpt", "round": round_num}
+    yield {
+        "type": "model_start",
+        "model": "gpt",
+        "model_id": slot_models["gpt"]["id"],
+        "model_name": slot_models["gpt"]["name"],
+        "provider": slot_models["gpt"]["provider"],
+        "round": round_num,
+    }
     gpt_content = ""
-    for chunk in call_model_streaming("gpt", gpt_messages, round_num, session_id):
+    for chunk in call_model_streaming(
+        "gpt", slot_models["gpt"], gpt_messages, round_num, session_id
+    ):
         yield chunk
         if chunk["type"] == "done":
             gpt_content = chunk["content"]
 
     # Claude streams
-    yield {"type": "model_start", "model": "claude", "round": round_num}
+    yield {
+        "type": "model_start",
+        "model": "claude",
+        "model_id": slot_models["claude"]["id"],
+        "model_name": slot_models["claude"]["name"],
+        "provider": slot_models["claude"]["provider"],
+        "round": round_num,
+    }
     claude_content = ""
-    for chunk in call_model_streaming("claude", claude_messages, round_num, session_id):
+    for chunk in call_model_streaming(
+        "claude", slot_models["claude"], claude_messages, round_num, session_id
+    ):
         yield chunk
         if chunk["type"] == "done":
             claude_content = chunk["content"]
@@ -480,13 +595,21 @@ def judge_debate(
     gpt_history: list[str],
     claude_history: list[str],
     session_id: str,
+    slot_models: dict[str, dict[str, Any]],
 ) -> dict:
     """Have Claude judge the full 10-round debate (non-streaming)."""
-    full_history = _build_debate_history(gpt_history, claude_history)
+    full_history = _build_debate_history(gpt_history, claude_history, slot_models)
 
     messages = build_messages(
         JUDGE_PROMPT,
         f'Topic: "{topic}"\n\n{full_history}\n\nWho won this debate and why? Note any rounds where prompt injection attacks were attempted and how each model handled them.'
     )
 
-    return call_model_sync("claude", messages, session_id, round_num=11, metadata={"role": "judge"})
+    return call_model_sync(
+        "judge",
+        slot_models["judge"],
+        messages,
+        session_id,
+        round_num=11,
+        metadata={"role": "judge"},
+    )
